@@ -24,6 +24,7 @@ dependencies:
 - optparse-applicative
 - unordered-containers
 - generic-lens
+- transformers
 - regex-tdfa
 - containers
 - microlens
@@ -63,6 +64,7 @@ library:
   - DeriveGeneric
   - DataKinds
   - DeriveAnyClass
+  - ConstraintKinds
 
 executables:
   todoCli-exe:
@@ -93,6 +95,7 @@ executables:
     - DeriveGeneric
     - DataKinds
     - DeriveAnyClass
+    - ConstraintKinds
 
 tests:
   todoCli-test:
