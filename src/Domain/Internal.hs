@@ -1,4 +1,4 @@
-module Domain.Internal (Task(..), TaskStatus(..), TaskId(unTaskId), minTaskId, Ids, initIds, allocId, releaseId) where
+module Domain.Internal (Task(..), TaskStatus(..), TaskId(..), minTaskId, Ids, initIds, allocId, releaseId) where
 
 import Data.Map qualified as M
 import Data.IntSet  qualified as IS
@@ -42,7 +42,7 @@ data TaskStatus
     (Hashable, Generic, Show, Ord, Eq)
 
 newtype TaskId = TaskId { unTaskId :: Int }
-  deriving (Show, Generic, Eq, Ord)
+  deriving (Show, Generic, Hashable, Eq, Ord)
 
 minTaskId :: TaskId
 minTaskId = TaskId 1
@@ -62,8 +62,10 @@ allocId ids
     | IS.null ids.released = (ids & #next . #unTaskId %~ succ, ids.next)
     | otherwise            = bimap (($ ids) . (#released .~)) TaskId . swap . IS.deleteFindMin $ ids.released
 
-releaseId :: TaskId -> Ids -> Maybe Ids
-releaseId tid ids = guard isValidId *> pure interim
+releaseId :: TaskId -> Ids -> Ids
+releaseId tid ids 
+    | isValidId = interim
+    | otherwise = ids
   where
     isValidId = and @[] $ [(>= minTaskId), (< ids.next)] <*> [tid]
     isMaxId   = (tid & #unTaskId %~ succ) == ids.next
