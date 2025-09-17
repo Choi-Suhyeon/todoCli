@@ -2,10 +2,8 @@ module CliParser.Options
     ( Options(..)       , Command(..)       , AddCommand(..)
     , ListCommand(..)   , EditCommand(..)   , MarkCommand(..)
     , DeleteCommand(..) , ListStatus(..)    , DeleteStatus(..)
-    )
-  where
+    ) where
 
-import Data.HashSet qualified as S
 import Data.Text    qualified as T
 
 import Data.Time.LocalTime (LocalTime)
