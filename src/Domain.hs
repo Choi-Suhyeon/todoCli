@@ -1,11 +1,10 @@
 module Domain
-    ( TaskSnapshot(..)         , EntryUpdate(..) , EntryCreate(..)     
-    , TodoRegistry             , MonadRegistry
-    , initTodoRegistry         , getAllTasks     , getTasksWithAllTags 
-    , getTasksByNameContaining , getDoneTasks    , getUndoneTasks  
-    , getOverdueTasks          , getDueTasks     , addTask                  
-    , editTask                 , markTask        , deleteTasks         
-    , getTaskSnapshots
+    ( module Domain.Error , module Domain.Type 
+    , TaskSnapshot(..)    , EntryCreate(..)     , EntryUpdate(..)     
+    , getAllTasks         , getTasksWithAllTags , getTasksByNameContaining 
+    , getDoneTasks        , getUndoneTasks      , getOverdueTasks          
+    , getDueTasks         , addTask             , editTask                 
+    , markTask            , deleteTasks         , getTaskSnapshots
     ) where
 
 import Data.List.NonEmpty qualified as NE
@@ -14,40 +13,28 @@ import Data.IntMap        qualified as IM
 import Data.Text          qualified as T
 import Data.Map           qualified as M
 
-import Data.Generics.Product.Fields ()
-import Control.Monad.State.Strict   (MonadState(..), gets, modify')
-import Control.Monad.Trans.Except   (runExceptT)
-import Control.Monad.Error.Class    (liftEither, throwError)
-import Data.Generics.Product        ()
-import Data.Generics.Labels         ()
-import Control.Monad.Reader         (ask, asks)
-import Data.Time.LocalTime          (TimeZone, utcToLocalTime)
-import Data.List.NonEmpty           (NonEmpty(..))
-import Data.Time.Clock 
-    ( UTCTime    , NominalDiffTime
-    , addUTCTime , secondsToNominalDiffTime
-    )
-import Lens.Micro.Type              (Getting, ASetter)
-import Data.Semigroup               (Semigroup(..))
-import Data.Foldable                (traverse_)
-import Data.Hashable                (Hashable)
-import Data.Function                (on, (&))
-import Control.Monad                (when)
-import GHC.Generics                 (Generic)
-import Data.HashSet                 (HashSet)
-import Data.IntMap                  (IntMap)
-import Lens.Micro                   ((^.), (%~), (.~))
-import Data.Maybe                   (fromMaybe, catMaybes)
-import Data.Bool                    (bool)
-import Data.Text                    (Text)
-import Data.Map                     (Map)
+import Control.Monad.State.Strict (MonadState(..), gets, modify')
+import Control.Monad.Trans.Except (runExceptT)
+import Control.Monad.Error.Class  (liftEither, throwError)
+import Data.Generics.Labels       ()
+import Control.Monad.Reader       (ask, asks)
+import Data.List.NonEmpty         (NonEmpty(..))
+import Data.Time.Clock            (UTCTime, addUTCTime)
+import Data.Semigroup             (Semigroup(..))
+import Data.Foldable              (traverse_)
+import Data.Function              (on, (&))
+import Control.Monad              (when)
+import GHC.Generics               (Generic)
+import Data.HashSet               (HashSet)
+import Lens.Micro                 ((^.), (%~), (.~))
+import Data.Maybe                 (catMaybes)
+import Data.Text                  (Text)
 
+import Domain.Type.Internal 
 import Domain.Internal
-    ( Task(..)  , TaskStatus(..) , TaskId(..) , Ids
-    , allocId   , releaseId      , initIds 
-    )
-import Domain.Error     (ErrCode(..), Result)
-import Env              (Env(..), MonadEnv)
+import Domain.Error 
+import Domain.Type 
+import Env        
 
 data TaskSnapshot
     = TaskSnapshot
@@ -56,15 +43,6 @@ data TaskSnapshot
     , tagsS     :: !(HashSet Text)
     , statusS   :: !TaskStatus
     , deadlineS :: !UTCTime
-    }
-  deriving (Show, Generic)
-
-data EntryUpdate
-    = EntryUpdate
-    { name     :: !(Maybe Text)
-    , desc     :: !(Maybe Text)
-    , tags     :: !(Maybe (HashSet Text))
-    , deadline :: !(Maybe UTCTime)
     }
   deriving (Show, Generic)
 
@@ -77,25 +55,14 @@ data EntryCreate
     }
   deriving (Show, Generic)
 
-data TodoRegistry
-    = TodoRegistry
-    { ids        :: !Ids
-    , idToTask   :: !(IntMap Task)
-    , tagToId    :: !(Map Text (HashSet TaskId))
-    , statusToId :: !(Map TaskStatus (HashSet TaskId))
+data EntryUpdate
+    = EntryUpdate
+    { name     :: !(Maybe Text)
+    , desc     :: !(Maybe Text)
+    , tags     :: !(Maybe (HashSet Text))
+    , deadline :: !(Maybe UTCTime)
     }
   deriving (Show, Generic)
-
-type MonadRegistry m = MonadState TodoRegistry m
-
-newtype Intersection a = Intersection { getIntersection :: HashSet a }
-  deriving (Show, Generic)
-
-instance (Eq a, Hashable a) => Semigroup (Intersection a) where
-    Intersection x <> Intersection y = Intersection (S.intersection x y)
-
-initTodoRegistry :: TodoRegistry
-initTodoRegistry = TodoRegistry initIds IM.empty M.empty M.empty
 
 getAllTasks :: MonadRegistry m => m (HashSet TaskId)
 getAllTasks = getTasksMatching (const True)
@@ -103,7 +70,7 @@ getAllTasks = getTasksMatching (const True)
 getTasksWithAllTags :: MonadRegistry m => HashSet Text -> m (HashSet TaskId)
 getTasksWithAllTags tags
     | S.null tags = getAllTasks
-    | otherwise   = gets $ \TodoRegistry{ tagToId } ->
+    | otherwise   = gets \TodoRegistry{ tagToId } ->
         tags
             & S.toList
             & map (Intersection . flip (M.findWithDefault S.empty) tagToId)
@@ -240,36 +207,4 @@ getTaskSnapshots tids = do
         , deadlineS = deadline
         }
 
-statusDueThreshold :: NominalDiffTime
-statusDueThreshold = secondsToNominalDiffTime $ 48 * 3600
-
-validateName :: Text -> Either ErrCode ()
-validateName n 
-    | T.null n  = Left EmptyTitle 
-    | otherwise = Right ()
-
-validateDeadline :: TimeZone -> UTCTime -> UTCTime -> Either ErrCode ()
-validateDeadline tz now dd
-    | dd > now  = Right ()
-    | otherwise = 
-        let
-            nowL = utcToLocalTime tz now
-            ddL  = utcToLocalTime tz dd
-        in
-            Left $ InvalidDeadline nowL ddL
-
-getTasksMatching ::  MonadRegistry m => (Task -> Bool) -> m (HashSet TaskId)
-getTasksMatching p = gets $ IM.foldrWithKey (\k -> bool id (S.insert (TaskId k)) . p) S.empty . (^. #idToTask)
-
-getTasksByStatus :: MonadRegistry m => TaskStatus -> m (HashSet TaskId)
-getTasksByStatus s = gets $ M.findWithDefault S.empty s . (^. #statusToId)
-
-deleteFromMapSetKeys :: (Foldable t, Ord k, Hashable a) => a -> t k -> Map k (HashSet a) -> Map k (HashSet a)
-deleteFromMapSetKeys val = flip $ foldr $ M.adjust (S.delete val)
-
-insertIntoMapSetKeysWith :: (Foldable t, Ord k, Hashable a) => (HashSet a -> HashSet a -> HashSet a) -> a -> t k -> Map k (HashSet a) -> Map k (HashSet a)
-insertIntoMapSetKeysWith f val = flip $ foldr \k -> M.insertWith f k (S.singleton val)
-
-updateIfJust :: Getting (Maybe a) s1 (Maybe a) -> ASetter s2 t a a -> s1 -> s2 -> t
-updateIfJust getL overL new = overL %~ flip fromMaybe (new ^. getL)
 

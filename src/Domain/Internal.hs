@@ -1,77 +1,60 @@
-module Domain.Internal (Task(..), TaskStatus(..), TaskId(..), minTaskId, Ids, initIds, allocId, releaseId) where
+module Domain.Internal 
+    ( statusDueThreshold , validateName         , validateDeadline         , getTasksMatching
+    , getTasksByStatus   , deleteFromMapSetKeys , insertIntoMapSetKeysWith , updateIfJust
+    ) where
 
-import Data.Map qualified as M
-import Data.IntSet  qualified as IS
+import Data.HashSet qualified as S
+import Data.IntMap  qualified as IM
 import Data.Text    qualified as T
+import Data.Map     qualified as M
 
-import Data.Time.Clock (UTCTime)
-import Data.Bifunctor  (bimap)
-import Data.Function   (on)
-import Control.Arrow   ((&&&))
-import Control.Monad   (guard)
-import Data.Hashable   (Hashable)
-import GHC.Generics    (Generic)
-import Data.HashSet    (HashSet)
-import Data.Map    (Map)
-import Data.IntMap     (IntMap)
-import Data.IntSet     (IntSet)
-import Data.Tuple      (swap)
-import Data.Bool       (bool)
-import Data.Text       (Text)
+import Control.Monad.State.Strict (gets)
+import Data.Generics.Labels       ()
+import Data.Time.LocalTime        (TimeZone, utcToLocalTime)
+import Data.Time.Clock            (UTCTime, NominalDiffTime, secondsToNominalDiffTime)
+import Lens.Micro.Type            (Getting, ASetter)
+import Data.Hashable              (Hashable)
+import Data.HashSet               (HashSet)
+import Lens.Micro                 ((^.), (%~))
+import Data.Maybe                 (fromMaybe)
+import Data.Bool                  (bool)
+import Data.Text                  (Text)
+import Data.Map                   (Map)
 
-import Control.Monad.State.Strict (MonadState(..))
-import Lens.Micro (Lens'(..), (&), (^.), (%~), (.~))
-import Data.Generics.Product.Fields ()
-import Data.Generics.Product (field)
-import Data.Generics.Labels ()
+import Domain.Type.Internal 
+import Domain.Error 
+import Domain.Type 
 
-data Task 
-    = Task
-    { name     :: !Text
-    , desc     :: !Text
-    , tags     :: !(HashSet Text)
-    , status   :: !TaskStatus
-    , deadline :: !UTCTime
-    }
-  deriving (Show, Generic)
+statusDueThreshold :: NominalDiffTime
+statusDueThreshold = secondsToNominalDiffTime $ 48 * 3600
 
-data TaskStatus
-    = Done
-    | Undone
-  deriving 
-    (Hashable, Generic, Show, Ord, Eq)
+validateName :: Text -> Either ErrCode ()
+validateName n 
+    | T.null n  = Left EmptyTitle 
+    | otherwise = Right ()
 
-newtype TaskId = TaskId { unTaskId :: Int }
-  deriving (Show, Generic, Hashable, Eq, Ord)
+validateDeadline :: TimeZone -> UTCTime -> UTCTime -> Either ErrCode ()
+validateDeadline tz now dd
+    | dd > now  = Right ()
+    | otherwise = 
+        let
+            nowL = utcToLocalTime tz now
+            ddL  = utcToLocalTime tz dd
+        in
+            Left $ InvalidDeadline nowL ddL
 
-minTaskId :: TaskId
-minTaskId = TaskId 1
+getTasksMatching ::  MonadRegistry m => (Task -> Bool) -> m (HashSet TaskId)
+getTasksMatching p = gets $ IM.foldrWithKey (\k -> bool id (S.insert (TaskId k)) . p) S.empty . (^. #idToTask)
 
-data Ids
-    = Ids
-    { next     :: !TaskId
-    , released :: !IntSet
-    }
-  deriving (Show, Generic)
+getTasksByStatus :: MonadRegistry m => TaskStatus -> m (HashSet TaskId)
+getTasksByStatus s = gets $ M.findWithDefault S.empty s . (^. #statusToId)
 
-initIds :: Ids
-initIds = Ids minTaskId IS.empty
+deleteFromMapSetKeys :: (Foldable t, Ord k, Hashable a) => a -> t k -> Map k (HashSet a) -> Map k (HashSet a)
+deleteFromMapSetKeys val = flip $ foldr $ M.adjust (S.delete val)
 
-allocId :: Ids -> (Ids, TaskId)
-allocId ids
-    | IS.null ids.released = (ids & #next . #unTaskId %~ succ, ids.next)
-    | otherwise            = bimap (($ ids) . (#released .~)) TaskId . swap . IS.deleteFindMin $ ids.released
+insertIntoMapSetKeysWith :: (Foldable t, Ord k, Hashable a) => (HashSet a -> HashSet a -> HashSet a) -> a -> t k -> Map k (HashSet a) -> Map k (HashSet a)
+insertIntoMapSetKeysWith f val = flip $ foldr \k -> M.insertWith f k (S.singleton val)
 
-releaseId :: TaskId -> Ids -> Ids
-releaseId tid ids 
-    | isValidId = interim
-    | otherwise = ids
-  where
-    isValidId = and @[] $ [(>= minTaskId), (< ids.next)] <*> [tid]
-    isMaxId   = (tid & #unTaskId %~ succ) == ids.next
-    isDoubleFreed = IS.member tid.unTaskId ids.released
-    interim
-        | isDoubleFreed = ids
-        | isMaxId       = ids & #next . #unTaskId %~ pred
-        | otherwise     = ids & #released %~ (IS.insert tid.unTaskId)
-            
+updateIfJust :: Getting (Maybe a) s1 (Maybe a) -> ASetter s2 t a a -> s1 -> s2 -> t
+updateIfJust getL overL new = overL %~ flip fromMaybe (new ^. getL)
+
