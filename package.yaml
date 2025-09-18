@@ -29,6 +29,8 @@ dependencies:
 - bytestring
 - containers
 - microlens
+- directory
+- filepath
 - hashable
 - cereal
 - text
