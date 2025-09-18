@@ -75,6 +75,8 @@ library
     , bytestring
     , cereal
     , containers
+    , directory
+    , filepath
     , generic-lens
     , hashable
     , microlens
@@ -122,6 +124,8 @@ executable todoCli-exe
     , bytestring
     , cereal
     , containers
+    , directory
+    , filepath
     , generic-lens
     , hashable
     , microlens
@@ -150,6 +154,8 @@ test-suite todoCli-test
     , bytestring
     , cereal
     , containers
+    , directory
+    , filepath
     , generic-lens
     , hashable
     , microlens
