@@ -33,6 +33,7 @@ dependencies:
 - filepath
 - hashable
 - cereal
+- boxes
 - text
 - time
 - mtl
@@ -70,6 +71,11 @@ library:
   - DeriveAnyClass
   - ConstraintKinds
   - StandaloneDeriving
+  - ScopedTypeVariables
+  - MultiWayIf
+  - GeneralizedNewtypeDeriving
+  - DerivingStrategies
+  - MultiParamTypeClasses
 
 executables:
   todoCli-exe:
@@ -102,6 +108,11 @@ executables:
     - DeriveAnyClass
     - ConstraintKinds
     - StandaloneDeriving
+    - ScopedTypeVariables
+    - MultiWayIf
+    - GeneralizedNewtypeDeriving
+    - DerivingStrategies
+    - MultiParamTypeClasses
 
 tests:
   todoCli-test:

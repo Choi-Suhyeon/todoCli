@@ -60,7 +60,8 @@ data TaskStatus
   deriving (Show, Generic, Eq, Ord, Hashable)
 
 newtype TaskId = TaskId { unTaskId :: Int }
-  deriving (Show, Generic, Eq, Ord, Hashable)
+  deriving stock   (Show, Generic, Eq, Ord)
+  deriving newtype (Hashable)
 
 minTaskId :: TaskId
 minTaskId = TaskId 1

@@ -1,1 +1,0 @@
-module Effect.Type () where

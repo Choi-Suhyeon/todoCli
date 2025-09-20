@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -Wno-orphans #-}
 
-module Domain.Serialization (Serializable(..), UsingCereal) where
+module Domain.Serialization (Serializable(..), UsingCereal(..)) where
 
 import Data.HashSet qualified as S
 import Data.Text    qualified as T
@@ -31,11 +31,11 @@ instance Serialize a => Serializable (UsingCereal a) where
     serialize   = encode . (^. #unUsingCereal)
     deserialize = bimap DeserializationFailed UsingCereal . decode 
 
-deriving instance Serialize TaskId
-deriving instance Serialize TaskStatus
-deriving instance Serialize Ids
-deriving instance Serialize Task
-deriving instance Serialize TodoRegistry
+deriving newtype instance Serialize TaskId
+deriving anyclass instance Serialize TaskStatus
+deriving anyclass instance Serialize Ids
+deriving anyclass instance Serialize Task
+deriving anyclass instance Serialize TodoRegistry
 
 instance Serialize UTCTime where
     put = put . round @POSIXTime @Int . utcTimeToPOSIXSeconds  
