@@ -36,12 +36,10 @@ library
       Domain.Type
       Domain.Type.Internal
       Effect
-      Effect.Error
-      Effect.Internal
+      Effect.Format
       Effect.Persistence
-      Effect.Presenter
-      Effect.Type
       Env
+      Util
   other-modules:
       Paths_todoCli
   autogen-modules:
@@ -69,9 +67,15 @@ library
       DeriveAnyClass
       ConstraintKinds
       StandaloneDeriving
+      ScopedTypeVariables
+      MultiWayIf
+      GeneralizedNewtypeDeriving
+      DerivingStrategies
+      MultiParamTypeClasses
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wredundant-constraints
   build-depends:
       base >=4.7 && <5
+    , boxes
     , bytestring
     , cereal
     , containers
@@ -118,9 +122,15 @@ executable todoCli-exe
       DeriveAnyClass
       ConstraintKinds
       StandaloneDeriving
+      ScopedTypeVariables
+      MultiWayIf
+      GeneralizedNewtypeDeriving
+      DerivingStrategies
+      MultiParamTypeClasses
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base >=4.7 && <5
+    , boxes
     , bytestring
     , cereal
     , containers
@@ -151,6 +161,7 @@ test-suite todoCli-test
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base >=4.7 && <5
+    , boxes
     , bytestring
     , cereal
     , containers

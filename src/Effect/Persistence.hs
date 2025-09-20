@@ -11,9 +11,11 @@ import System.Directory
 import Data.ByteString           (ByteString, readFile, hPutStr)
 import System.FilePath           ((</>), (<.>))
 import Control.Monad             (when)
+import Data.Function             (on)
 import System.IO                 (openBinaryTempFile, hClose)
 
-import Effect.Internal
+
+import Util
 
 readData :: IO ByteString
 readData = (</> dataFileName) <$> getDataDirectory >>= readFile
@@ -22,7 +24,7 @@ writeData :: ByteString -> IO ()
 writeData bs = getDataDirectory >>= \dir ->
     bracketOnError
         (openBinaryTempFile dir $ dataFileName <.> "tmp")
-        (\(tmp, h) -> hClose h *> ignoreIOExceptions (removeFile tmp))
+        ((liftA2 (*>) `on` (ignoreIOExceptions .)) (hClose . snd) (removeFile . fst))
         \(tmp, h) -> do
             hPutStr h bs
             hClose h

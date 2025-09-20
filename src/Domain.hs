@@ -1,6 +1,7 @@
 module Domain
     ( module Domain.Error , module Domain.Type 
     , TaskSnapshot(..)    , EntryCreate(..)     , EntryUpdate(..)     
+    , SnapshotStatus(..)
     , getAllTasks         , getTasksWithAllTags , getTasksByNameContaining 
     , getDoneTasks        , getUndoneTasks      , getOverdueTasks          
     , getDueTasks         , addTask             , editTask                 
@@ -41,10 +42,17 @@ data TaskSnapshot
     { nameS     :: !Text
     , descS     :: !Text
     , tagsS     :: !(HashSet Text)
-    , statusS   :: !TaskStatus
+    , statusS   :: !SnapshotStatus
     , deadlineS :: !UTCTime
     }
   deriving (Show, Generic)
+
+data SnapshotStatus
+    = DoneS
+    | UndoneS
+    | DueS
+    | OverdueS
+  deriving (Show, Generic, Eq, Ord)
 
 data EntryCreate
     = EntryCreate
@@ -96,9 +104,9 @@ getOverdueTasks = do
     TodoRegistry{ idToTask } <- get
 
     let 
-        isOverdue (TaskId tid) = maybe False ((<= now) . (^. #deadline)) $ idToTask IM.!? tid
+        isOverdueTask (TaskId tid) = maybe False ((<= now) . (^. #deadline)) $ idToTask IM.!? tid
 
-    pure $ S.filter isOverdue undoneIds
+    pure $ S.filter isOverdueTask undoneIds
 
 getDueTasks :: (MonadRegistry m, MonadEnv m) => m (HashSet TaskId)
 getDueTasks = do
@@ -107,10 +115,9 @@ getDueTasks = do
     TodoRegistry{ idToTask } <- get
 
     let 
-        isDue'             = liftA2 (&&) (> now) (<= addUTCTime statusDueThreshold now)
-        isDue (TaskId tid) = maybe False (isDue' . (^. #deadline)) $ idToTask IM.!? tid
+        isDueTask (TaskId tid) = maybe False (isDue now . (^. #deadline)) $ idToTask IM.!? tid
 
-    pure $ S.filter isDue undoneIds
+    pure $ S.filter isDueTask undoneIds
 
 addTask :: (MonadRegistry m, MonadEnv m) => EntryCreate -> m (Result ())
 addTask e = runExceptT do
@@ -184,27 +191,38 @@ deleteTasks = modify' . flip (foldl' go)
                 & #idToTask   %~ IM.delete tid.unTaskId 
                 & #ids        %~ releaseId tid
 
-getTaskSnapshots :: MonadRegistry m => HashSet TaskId -> m [TaskSnapshot]
+getTaskSnapshots :: (MonadRegistry m, MonadEnv m) => HashSet TaskId -> m [TaskSnapshot]
 getTaskSnapshots tids = do
     TodoRegistry{ idToTask } <- get
+    env                      <- ask
+
     pure 
         $ catMaybes 
         . map 
-            ( (fromTaskToSnapshot <$>)
+            ( (fromTaskToSnapshot env <$>)
             . (idToTask IM.!?) 
             . (^. #unTaskId)
             ) 
         . S.toList
         $ tids
   where
-    fromTaskToSnapshot :: Task -> TaskSnapshot
-    fromTaskToSnapshot (Task { .. }) 
+    fromTaskToSnapshot :: Env -> Task -> TaskSnapshot
+    fromTaskToSnapshot Env{ now } Task{ .. } 
         = TaskSnapshot 
-        { nameS     = name
-        , descS     = desc
-        , tagsS     = tags
-        , statusS   = status
-        , deadlineS = deadline
-        }
+            { nameS     = name
+            , descS     = desc
+            , tagsS     = tags
+            , deadlineS = deadline
+            , statusS   = case status of
+                Done -> DoneS
+                Undone
+                    | isDue     now deadline -> DueS
+                    | isOverdue now deadline -> OverdueS
+                    | otherwise              -> UndoneS
+            }
 
+isDue :: UTCTime -> UTCTime -> Bool
+isDue now = liftA2 (&&) (> now) (<= addUTCTime statusDueThreshold now)
 
+isOverdue :: UTCTime -> UTCTime -> Bool
+isOverdue now = (<= now)
