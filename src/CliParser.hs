@@ -1,16 +1,16 @@
-module CliParser (opts) where
+module CliParser (module CliParser.Options, parseOpts) where
 
 import Data.HashSet qualified as S
 import Data.Text    qualified as T
 
 import Options.Applicative
     ( ParserInfo      , Parser     , ReadM
-    , strArgument     , command    , option      , help
-    , strOption       , short      , long        , auto
-    , maybeReader     , metavar    , value       , info
-    , parserFailure   , header     , fullDesc    , progDesc
-    , renderFailure   , helper     , infoOption  , hidden
-    , simpleVersioner , hsubparser
+    , strArgument     , command    , option     , help
+    , hidden          , short      , long       , auto
+    , maybeReader     , metavar    , value      , info
+    , parserFailure   , header     , fullDesc   , progDesc
+    , renderFailure   , helper     , infoOption , hsubparser
+    , simpleVersioner , execParser  
     )
 import Options.Applicative.Builder (ParseError(..), prefs, columns)
 import Data.Time.Format.ISO8601    (iso8601ParseM, parseFormatExtension, calendarFormat)
@@ -26,10 +26,9 @@ import Control.Monad               (mfilter)
 import Paths_todoCli (version)
 
 import CliParser.Options
-    ( Options(..)       , Command(..)     , AddCommand(..)
-    , ListCommand(..)   , EditCommand(..) , MarkCommand(..)
-    , DeleteCommand(..) , ListStatus(..)  , DeleteStatus(..)
-    )
+
+parseOpts :: IO Options
+parseOpts = execParser opts
 
 opts :: ParserInfo Options
 opts = info (pOptions <**> helper <**> longHelpOpt <**> versionOpt)
@@ -120,7 +119,7 @@ pAddCommand :: Parser AddCommand
 pAddCommand = AddCommand <$> pName <*> pDeadline <*> pDesc <*> pTags
   where
     pName :: Parser Text
-    pName = strOption
+    pName = option nameReader
         $  short   'n'
         <> long    "name"
         <> metavar "NAME"
@@ -134,7 +133,7 @@ pAddCommand = AddCommand <$> pName <*> pDeadline <*> pDesc <*> pTags
         <> help    "Deadline as YYYY-MM-DD or ISO 8601 datetime; date-only defaults to 23:59:59"
 
     pDesc :: Parser Text
-    pDesc = strOption
+    pDesc = option descReader
         $  short   'd'
         <> long    "desc"
         <> metavar "DESCRIPTION"
@@ -174,14 +173,14 @@ pEditCommand = EditCommand <$> pTgtName <*> pName <*> pDesc <*> pTags <*> pDeadl
     pTgtName = strArgument $ metavar "TARGET_NAME"
 
     pName :: Parser (Maybe Text)
-    pName = optional $ strOption
+    pName = optional $ option nameReader
         $  short   'n'
         <> long    "name"
         <> metavar "NEW_NAME"
         <> help    "New task name"
 
     pDesc :: Parser (Maybe Text)
-    pDesc = optional $ strOption
+    pDesc = optional $ option descReader
         $  short   'd'
         <> long    "desc"
         <> metavar "NEW_DESCRIPTION"
@@ -220,7 +219,7 @@ pDeleteCommand = hsubparser
     pDelBy = DelBy <$> pByName <*> pByTags <*> pByStatus
     
     pByName :: Parser (Maybe Text)
-    pByName = optional $ strOption
+    pByName = optional $ option nameReader
         $  short   'n'
         <> long    "name"
         <> metavar "NAME"
@@ -239,6 +238,16 @@ pDeleteCommand = hsubparser
         <> long    "status"
         <> metavar "STATUS"
         <> help    "Filter by task status (done or overdue)"
+
+nameReader :: ReadM Text
+nameReader = maybeReader \s -> if
+    | length s <= 30 -> Just $ T.pack s
+    | otherwise      -> Nothing
+
+descReader :: ReadM Text
+descReader = maybeReader \s -> if
+    | length s <= 60 -> Just $ T.pack s
+    | otherwise      -> Nothing
 
 datetimeReader :: ReadM LocalTime
 datetimeReader = maybeReader 
@@ -259,8 +268,8 @@ textSetReader = maybeReader
     . T.pack
   where
     checkComponentValid :: Maybe Text -> Maybe Text
-    checkComponentValid = mfilter (=~ ("^ *[A-Z]+( +[A-Z]+)* *$" :: Text))
+    checkComponentValid = mfilter (=~ ("^ *[A-Z]{1,10}( +[A-Z]{1,10})* *$" :: Text))
 
     checkSet'sLenValid :: Maybe (HashSet Text) -> Maybe (HashSet Text)
-    checkSet'sLenValid = mfilter $ liftA2 (&&) (> 0) (<= 10) . length
+    checkSet'sLenValid = mfilter $ liftA2 (&&) (> 0) (<= 4) . length
 
