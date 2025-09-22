@@ -10,15 +10,13 @@ import Data.Text    qualified as T
 import Data.Time.Format.ISO8601 (iso8601Show)
 import Text.PrettyPrint.Boxes   (Box, render, vsep, hsep, text, left, top)
 import Data.Time.LocalTime      (TimeZone, utcToLocalTime)
-import GHC.Generics             (Generic)
 import Data.String              (IsString)
-import Lens.Micro               ((&), (^.))
 import Data.List                (sort, sortBy)
 import Data.Ord                 (Down(..), comparing)
 
 import Domain (TaskSnapshot(..), SnapshotStatus(..))
 
-import Util
+import Common
 
 data Column a b
     = Column

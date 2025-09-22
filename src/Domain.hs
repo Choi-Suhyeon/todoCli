@@ -15,19 +15,13 @@ import Data.Text          qualified as T
 import Data.Map           qualified as M
 
 import Control.Monad.State.Strict (MonadState(..), gets, modify')
-import Control.Monad.Trans.Except (runExceptT)
-import Control.Monad.Error.Class  (liftEither, throwError)
-import Data.Generics.Labels       ()
 import Control.Monad.Reader       (ask, asks)
 import Data.List.NonEmpty         (NonEmpty(..))
 import Data.Time.Clock            (UTCTime, addUTCTime)
 import Data.Semigroup             (Semigroup(..))
-import Data.Foldable              (traverse_)
-import Data.Function              (on, (&))
+import Data.Function              (on)
 import Control.Monad              (when)
-import GHC.Generics               (Generic)
 import Data.HashSet               (HashSet)
-import Lens.Micro                 ((^.), (%~), (.~))
 import Data.Maybe                 (catMaybes)
 import Data.Text                  (Text)
 
@@ -35,7 +29,7 @@ import Domain.Type.Internal
 import Domain.Internal
 import Domain.Error 
 import Domain.Type 
-import Env        
+import Common       
 
 data TaskSnapshot
     = TaskSnapshot
@@ -119,16 +113,12 @@ getDueTasks = do
 
     pure $ S.filter isDueTask undoneIds
 
-addTask :: (MonadRegistry m, MonadEnv m) => EntryCreate -> m (Result ())
-addTask e = runExceptT do
-    Env{ .. } <- ask
-
-    traverse_ @[] liftEither
-        [ validateName            e.name
-        , validateDeadline tz now e.deadline
-        ]
-
+addTask :: (MonadRegistry m, MonadEnv m, MonadDomainError e m) => EntryCreate -> m ()
+addTask e = do
+    Env{ .. }   <- ask
     (ids', tid) <- gets (allocId . (^. #ids))
+
+    liftEitherFrom $ validateDeadline tz now e.deadline
 
     modify'
         $ (#ids        .~ ids')
@@ -144,17 +134,14 @@ addTask e = runExceptT do
         , status   = Undone
         }
 
-editTask :: (MonadRegistry m, MonadEnv m) => EntryUpdate -> TaskId -> m (Result ())
-editTask e tid = runExceptT do
+editTask :: (MonadRegistry m, MonadEnv m, MonadDomainError e m) => EntryUpdate -> TaskId -> m ()
+editTask e tid = do
     Env{ .. } <- ask
 
-    traverse_ @[] liftEither
-        [ maybe (pure ()) validateName              e.name
-        , maybe (pure ()) (validateDeadline tz now) e.deadline
-        ]
+    liftEitherFrom $ maybe (pure ()) (validateDeadline tz now) e.deadline
 
     gets ((IM.!? tid.unTaskId) . (^. #idToTask)) >>= \case
-        Nothing  -> throwError TaskNotFound
+        Nothing  -> throwErrorFrom TaskNotFound
         Just old -> modify' 
             $ (#idToTask %~ IM.insert tid.unTaskId newTask)
             . (#tagToId  %~ maybe id updateTags e.tags)

@@ -1,9 +1,10 @@
-module Env (Env(..), MonadEnv) where
+module Common.Env (Env(..), MonadEnv) where
 
 import Control.Monad.Reader (MonadReader)
 import Data.Time.LocalTime  (TimeZone)
 import Data.Time.Clock      (UTCTime)
-import GHC.Generics         (Generic)
+
+import Common.Optics
 
 data Env 
     = Env 

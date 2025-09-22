@@ -25,9 +25,13 @@ source-repository head
 
 library
   exposed-modules:
-      AbstractError
       CliParser
       CliParser.Options
+      Common
+      Common.AbstractError
+      Common.Env
+      Common.Optics
+      Common.Util
       Domain
       Domain.Adapter
       Domain.Error
@@ -36,10 +40,9 @@ library
       Domain.Type
       Domain.Type.Internal
       Effect
+      Effect.Error
       Effect.Format
       Effect.Persistence
-      Env
-      Util
   other-modules:
       Paths_todoCli
   autogen-modules:
@@ -72,6 +75,7 @@ library
       GeneralizedNewtypeDeriving
       DerivingStrategies
       MultiParamTypeClasses
+      FunctionalDependencies
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wredundant-constraints
   build-depends:
       base >=4.7 && <5
@@ -127,6 +131,7 @@ executable todoCli-exe
       GeneralizedNewtypeDeriving
       DerivingStrategies
       MultiParamTypeClasses
+      FunctionalDependencies
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base >=4.7 && <5

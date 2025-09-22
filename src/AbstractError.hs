@@ -1,1 +1,0 @@
-module AbstractError () where

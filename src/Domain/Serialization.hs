@@ -22,7 +22,7 @@ import Domain.Error
 
 class Serializable a where
     serialize   :: a -> ByteString
-    deserialize :: ByteString -> Result a
+    deserialize :: ByteString -> Either DomainError a
 
 newtype UsingCereal a = UsingCereal { unUsingCereal :: a }  
   deriving (Show, Generic)

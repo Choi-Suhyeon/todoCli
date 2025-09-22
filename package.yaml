@@ -76,6 +76,7 @@ library:
   - GeneralizedNewtypeDeriving
   - DerivingStrategies
   - MultiParamTypeClasses
+  - FunctionalDependencies
 
 executables:
   todoCli-exe:
@@ -113,6 +114,7 @@ executables:
     - GeneralizedNewtypeDeriving
     - DerivingStrategies
     - MultiParamTypeClasses
+    - FunctionalDependencies
 
 tests:
   todoCli-test:

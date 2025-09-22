@@ -1,4 +1,9 @@
-module Effect (module Effect.Format, module Effect.Persistence) where
+module Effect 
+    ( module Effect.Persistence
+    , module Effect.Format
+    , module Effect.Error
+    ) where
 
-import Effect.Format
 import Effect.Persistence
+import Effect.Format
+import Effect.Error

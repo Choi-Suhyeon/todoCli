@@ -7,10 +7,11 @@ module CliParser.Options
 import Data.Text    qualified as T
 
 import Data.Time.LocalTime (LocalTime)
-import GHC.Generics        (Generic)
 import Data.HashSet        (HashSet)
 import Data.Text           (Text)
 import Data.Char           (isSpace)
+
+import Common
 
 data Options = Options { optCommand :: Command }
   deriving (Show, Generic)

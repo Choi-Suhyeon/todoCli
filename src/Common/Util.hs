@@ -1,4 +1,4 @@
-module Util (tee, teeM, (>!), (.:), weave) where
+module Common.Util (tee, teeM, (>!), (.:), weave) where
 
 import Data.Functor ((<&>))
 

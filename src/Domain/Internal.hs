@@ -1,11 +1,10 @@
 module Domain.Internal 
-    ( statusDueThreshold , validateName         , validateDeadline         , getTasksMatching
-    , getTasksByStatus   , deleteFromMapSetKeys , insertIntoMapSetKeysWith , updateIfJust
+    ( statusDueThreshold   , validateDeadline         , getTasksMatching , getTasksByStatus
+    , deleteFromMapSetKeys , insertIntoMapSetKeysWith , updateIfJust
     ) where
 
 import Data.HashSet qualified as S
 import Data.IntMap  qualified as IM
-import Data.Text    qualified as T
 import Data.Map     qualified as M
 
 import Control.Monad.State.Strict (gets)
@@ -18,7 +17,6 @@ import Data.HashSet               (HashSet)
 import Lens.Micro                 ((^.), (%~))
 import Data.Maybe                 (fromMaybe)
 import Data.Bool                  (bool)
-import Data.Text                  (Text)
 import Data.Map                   (Map)
 
 import Domain.Type.Internal 
@@ -28,12 +26,7 @@ import Domain.Type
 statusDueThreshold :: NominalDiffTime
 statusDueThreshold = secondsToNominalDiffTime $ 48 * 3600
 
-validateName :: Text -> Either ErrCode ()
-validateName n 
-    | T.null n  = Left EmptyTitle 
-    | otherwise = Right ()
-
-validateDeadline :: TimeZone -> UTCTime -> UTCTime -> Either ErrCode ()
+validateDeadline :: TimeZone -> UTCTime -> UTCTime -> Either DomainError ()
 validateDeadline tz now dd
     | dd > now  = Right ()
     | otherwise = 
