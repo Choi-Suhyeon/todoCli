@@ -1,7 +1,7 @@
 module Domain
     ( module Domain.Error , module Domain.Type 
     , TaskSnapshot(..)    , EntryCreate(..)     , EntryUpdate(..)     
-    , SnapshotStatus(..)
+    , SnapshotStatus(..)  , MarkStatus(..)
     , getAllTasks         , getTasksWithAllTags , getTasksByNameContaining 
     , getDoneTasks        , getUndoneTasks      , getOverdueTasks          
     , getDueTasks         , addTask             , editTask                 
@@ -42,11 +42,16 @@ data TaskSnapshot
   deriving (Show, Generic)
 
 data SnapshotStatus
-    = DoneS
-    | UndoneS
-    | DueS
-    | OverdueS
+    = SDone
+    | SUndone
+    | SDue
+    | SOverdue
   deriving (Show, Generic, Eq, Ord)
+
+data MarkStatus
+    = MDone
+    | MUndone
+  deriving (Show, Generic)
 
 data EntryCreate
     = EntryCreate
@@ -157,13 +162,16 @@ editTask e tid = do
                 = insertIntoMapSetKeysWith (<>) tid ts 
                 . deleteFromMapSetKeys tid old.tags
 
-markTask :: MonadRegistry m => TaskId -> TaskStatus -> m ()
-markTask tid s = do
+markTask :: MonadRegistry m => MarkStatus -> TaskId -> m ()
+markTask s tid = do
     exists <- gets $ IM.member tid.unTaskId . (^. #idToTask)
 
+    let
+        s' = markStatusToTaskStatus s
+
     when exists . modify' 
-        $ (#idToTask %~ IM.adjust (#status .~ s) tid.unTaskId)
-        . (#statusToId %~ M.insertWith S.union s (S.singleton tid) . M.map (S.delete tid))
+        $ (#idToTask %~ IM.adjust (#status .~ s') tid.unTaskId)
+        . (#statusToId %~ M.insertWith S.union s' (S.singleton tid) . M.map (S.delete tid))
 
 deleteTasks :: MonadRegistry m => HashSet TaskId -> m ()
 deleteTasks = modify' . flip (foldl' go)
@@ -201,11 +209,11 @@ getTaskSnapshots tids = do
             , tagsS     = tags
             , deadlineS = deadline
             , statusS   = case status of
-                Done -> DoneS
+                Done -> SDone
                 Undone
-                    | isDue     now deadline -> DueS
-                    | isOverdue now deadline -> OverdueS
-                    | otherwise              -> UndoneS
+                    | isDue     now deadline -> SDue
+                    | isOverdue now deadline -> SOverdue
+                    | otherwise              -> SUndone
             }
 
 isDue :: UTCTime -> UTCTime -> Bool
@@ -213,3 +221,7 @@ isDue now = liftA2 (&&) (> now) (<= addUTCTime statusDueThreshold now)
 
 isOverdue :: UTCTime -> UTCTime -> Bool
 isOverdue now = (<= now)
+
+markStatusToTaskStatus :: MarkStatus -> TaskStatus
+markStatusToTaskStatus MDone   = Done
+markStatusToTaskStatus MUndone = Undone

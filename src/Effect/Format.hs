@@ -78,8 +78,8 @@ renderTableWithout xs RenderConfig{ .. } ts
     renderTable' vs hs = (render . hsep hs top . (vsep vs left <$>)) .: weave 
 
 getStatusSymbol :: IsString a => SnapshotStatus -> a
-getStatusSymbol OverdueS = "[X]"
-getStatusSymbol DueS     = "[!]"
-getStatusSymbol UndoneS  = "[U]"
-getStatusSymbol DoneS    = "[O]"
+getStatusSymbol SOverdue = "[X]"
+getStatusSymbol SDue     = "[!]"
+getStatusSymbol SUndone  = "[U]"
+getStatusSymbol SDone    = "[O]"
 

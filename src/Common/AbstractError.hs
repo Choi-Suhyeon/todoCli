@@ -1,9 +1,12 @@
-module Common.AbstractError (FromErr(..), throwErrorFrom, liftEitherFrom, liftEitherWith, liftEitherAs) where
+module Common.AbstractError (IsError(..), FromErr(..), throwErrorFrom, liftEitherFrom, liftEitherWith, liftEitherAs) where
 
 import Control.Monad.Except (MonadError(..))
 import Data.Bifunctor       (first)
 
-class FromErr t e | t -> e where
+class IsError e where
+    displayError :: e -> String
+
+class (IsError e) => FromErr t e | t -> e where
     fromErr :: t -> e
 
 throwErrorFrom :: forall e t m a. (MonadError e m, FromErr t e) => t -> m a
