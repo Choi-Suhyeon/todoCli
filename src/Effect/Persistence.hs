@@ -1,30 +1,33 @@
 module Effect.Persistence (readData, writeData) where
 
+import Control.Exception (Exception, IOException, bracketOnError, try)
+import Control.Monad (when)
+import Control.Monad.IO.Class (MonadIO (..))
+import Data.ByteString (ByteString, hPutStr, readFile)
+import System.Directory
+    ( XdgDirectory (..)
+    , createDirectoryIfMissing
+    , doesFileExist
+    , getXdgDirectory
+    , removeFile
+    , renameFile
+    )
+import System.FilePath ((<.>), (</>))
+import System.IO (hClose, openBinaryTempFile)
 import Prelude hiding (readFile)
 
-import Control.Monad.IO.Class    (MonadIO(..))
-import Control.Exception         (Exception, IOException, bracketOnError, try)
-import System.Directory  
-    ( XdgDirectory(..)         , getXdgDirectory , doesFileExist
-    , createDirectoryIfMissing , removeFile      , renameFile
-    )
-import Data.ByteString           (ByteString, readFile, hPutStr)
-import System.FilePath           ((</>), (<.>))
-import Control.Monad             (when)
-import System.IO                 (openBinaryTempFile, hClose)
-
-import Effect.Error
 import Common
+import Effect.Error
 
-readData :: (MonadIO m, MonadEffectError e m) => m ByteString
-readData 
-    =   (</> dataFileName) <$> getDataDirectory 
-    >>= liftSafeIO @IOException . readFile 
-    >>= liftEitherAs ReadFailed
+readData :: (MonadEffectError e m, MonadIO m) => m ByteString
+readData =
+    (</> dataFileName) <$> getDataDirectory
+        >>= liftSafeIO @IOException . readFile
+        >>= liftEitherAs ReadFailed
 
-writeData :: (MonadIO m, MonadEffectError e m) => ByteString -> m ()
+writeData :: (MonadEffectError e m, MonadIO m) => ByteString -> m ()
 writeData bs = do
-    dir    <- getDataDirectory
+    dir <- getDataDirectory
     result <- liftSafeIO @IOException $ bracketOnError
         (openBinaryTempFile dir $ dataFileName <.> "tmp")
         (liftA2 (*>) (hClose . snd) (removeFile . fst))
@@ -41,11 +44,12 @@ writeData bs = do
             renameFile tmp fullPath
 
     liftEitherAs WriteFailed result
-        
-getDataDirectory :: (MonadIO m, MonadEffectError e m) => m FilePath
-getDataDirectory 
-    =   liftSafeIO @IOException (getXdgDirectory XdgData dataDirectoryName >! createDirectoryIfMissing True) 
-    >>= liftEitherAs GettingDataDirectoryFailed
+
+getDataDirectory :: (MonadEffectError e m, MonadIO m) => m FilePath
+getDataDirectory =
+    liftSafeIO @IOException
+        (getXdgDirectory XdgData dataDirectoryName >! createDirectoryIfMissing True)
+        >>= liftEitherAs GettingDataDirectoryFailed
 
 liftSafeIO :: (Exception e, MonadIO m) => IO a -> m (Either e a)
 liftSafeIO = liftIO . try

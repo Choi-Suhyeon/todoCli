@@ -1,6 +1,6 @@
-module Effect.Error (MonadEffectError, EffectError(..)) where
+module Effect.Error (MonadEffectError, EffectError (..)) where
 
-import Control.Monad.Except (MonadError(..))
+import Control.Monad.Except (MonadError (..))
 
 import Common (FromErr)
 
@@ -15,4 +15,3 @@ instance Show EffectError where
     show GettingDataDirectoryFailed = "Failed to find data storage directory"
     show ReadFailed = "Failed to load data"
     show WriteFailed = "Failed to save data"
-

@@ -1,1 +1,0 @@
-module Domain.Adapter () where

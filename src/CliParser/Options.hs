@@ -1,97 +1,103 @@
-module CliParser.Options 
-    ( Options(..)       , Command(..)       , AddCommand(..)
-    , ListCommand(..)   , EditCommand(..)   , MarkCommand(..)
-    , DeleteCommand(..) , ListStatus(..)    , DeleteStatus(..)
+module CliParser.Options
+    ( Options (..)
+    , Command (..)
+    , AddCommand (..)
+    , ListCommand (..)
+    , EditCommand (..)
+    , MarkCommand (..)
+    , DeleteCommand (..)
+    , ListStatus (..)
+    , DeleteStatus (..)
     ) where
 
-import Data.Text    qualified as T
-
+import Data.Char (isSpace)
+import Data.HashSet (HashSet)
+import Data.Text (Text)
 import Data.Time.LocalTime (LocalTime)
-import Data.HashSet        (HashSet)
-import Data.Text           (Text)
-import Data.Char           (isSpace)
+
+import Data.Text qualified as T
 
 import Common
 
-data Options = Options { optCommand :: Command }
-  deriving (Show, Generic)
+data Options = Options {optCommand :: Command}
+    deriving (Generic, Show)
 
 data Command
-    = Add    AddCommand
-    | List   ListCommand
-    | Edit   EditCommand
-    | Mark   MarkCommand
+    = Add AddCommand
+    | List ListCommand
+    | Edit EditCommand
+    | Mark MarkCommand
     | Delete DeleteCommand
-  deriving (Show, Generic)
+    deriving (Generic, Show)
 
 data AddCommand
     = AddCommand
-    { name     :: Text
+    { name :: Text
     , deadline :: LocalTime
-    , desc     :: Text
-    , tags     :: HashSet Text
+    , desc :: Text
+    , tags :: HashSet Text
     }
-  deriving (Show, Generic)
+    deriving (Generic, Show)
 
 data ListCommand
     = ListCommand
-    { tags   :: HashSet Text
+    { tags :: HashSet Text
     , status :: Maybe ListStatus
     }
-  deriving (Show, Generic)
+    deriving (Generic, Show)
 
 data EditCommand
     = EditCommand
-    { tgtName  :: Text
-    , name     :: Maybe Text
-    , desc     :: Maybe Text
-    , tags     :: Maybe (HashSet Text)
+    { tgtName :: Text
+    , name :: Maybe Text
+    , desc :: Maybe Text
+    , tags :: Maybe (HashSet Text)
     , deadline :: Maybe LocalTime
     }
-  deriving (Show, Generic)
+    deriving (Generic, Show)
 
 data MarkCommand
-    = MrkDone   Text
+    = MrkDone Text
     | MrkUndone Text
-  deriving (Show, Generic)
+    deriving (Generic, Show)
 
 data DeleteCommand
     = DelAll
     | DelBy
-        { byName   :: Maybe Text
-        , byTags   :: Maybe (HashSet Text)
+        { byName :: Maybe Text
+        , byTags :: Maybe (HashSet Text)
         , byStatus :: Maybe DeleteStatus
         }
-  deriving (Show, Generic)
+    deriving (Generic, Show)
 
-data ListStatus 
-    = LstDone 
-    | LstUndone 
-    | LstDue 
+data ListStatus
+    = LstDone
+    | LstUndone
+    | LstDue
     | LstOverdue
-  deriving (Show, Generic)
+    deriving (Generic, Show)
 
 instance Read ListStatus where
     readsPrec _ str = case T.toUpper tgt of
-        "DONE"    -> [(LstDone, restLtrimmed)]
-        "UNDONE"  -> [(LstUndone, restLtrimmed)]
-        "DUE"     -> [(LstDue, restLtrimmed)]
+        "DONE" -> [(LstDone, restLtrimmed)]
+        "UNDONE" -> [(LstUndone, restLtrimmed)]
+        "DUE" -> [(LstDue, restLtrimmed)]
         "OVERDUE" -> [(LstOverdue, restLtrimmed)]
-        _         -> []
+        _ -> []
       where
-        (tgt, rest)  = T.break isSpace . T.pack $ str
+        (tgt, rest) = T.break isSpace . T.pack $ str
         restLtrimmed = T.unpack . T.stripStart $ rest
 
 data DeleteStatus
     = DelDone
     | DelOverdue
-  deriving (Show, Generic)
+    deriving (Generic, Show)
 
 instance Read DeleteStatus where
     readsPrec _ str = case T.toUpper tgt of
-        "DONE"    -> [(DelDone, restLtrimmed)]
+        "DONE" -> [(DelDone, restLtrimmed)]
         "OVERDUE" -> [(DelOverdue, restLtrimmed)]
-        _         -> []
+        _ -> []
       where
-        (tgt, rest)  = T.break isSpace . T.pack $ str
+        (tgt, rest) = T.break isSpace . T.pack $ str
         restLtrimmed = T.unpack . T.stripStart $ rest

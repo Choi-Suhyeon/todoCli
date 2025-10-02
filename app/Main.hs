@@ -2,51 +2,55 @@
 
 module Main (main) where
 
+import Control.Exception (ErrorCall, evaluate, try)
+import Control.Monad ((>=>))
+import Control.Monad.Except
+    ( ExceptT (..)
+    , MonadError
+    , runExceptT
+    , throwError
+    )
+import Control.Monad.IO.Class (MonadIO (..))
+import Control.Monad.Reader (MonadReader, ReaderT, ask, asks, runReaderT)
+import Control.Monad.State.Strict (MonadState, StateT, runStateT)
+import Data.Foldable (Foldable (..), foldr1)
+import Data.Maybe (catMaybes)
+import Data.Text (Text)
+import Data.Time.Clock (getCurrentTime)
+import Data.Time.LocalTime (getCurrentTimeZone, localTimeToUTC)
+import System.Exit (die, exitSuccess)
+import Prelude hiding (Foldable (..))
+
 import Data.HashSet qualified as S
 
-import Prelude hiding (Foldable(..))
-
-import Control.Monad.State.Strict (MonadState, StateT, runStateT)
-import Control.Monad.IO.Class     (MonadIO(..))
-import Control.Monad.Except       (ExceptT(..), MonadError, runExceptT, throwError)
-import Control.Monad.Reader       (MonadReader, ReaderT, runReaderT, ask, asks)
-import Data.Time.LocalTime        (getCurrentTimeZone, localTimeToUTC)
-import Control.Exception          (ErrorCall, evaluate, try)
-import Data.Time.Clock            (getCurrentTime)
-import Data.Foldable              (Foldable(..), foldr1)
-import Control.Monad              ((>=>))
-import System.Exit                (die, exitSuccess)
-import Data.Maybe                 (catMaybes)
-import Data.Text                  (Text)
-
-import Domain.Serialization
-import CliParser 
+import CliParser
 import Common
 import Domain
+import Domain.Serialization
 import Effect
 
-newtype App a = App { unApp :: ReaderT Env (StateT TodoRegistry (ExceptT AppError IO)) a }
-  deriving stock
-    ( Generic
-    )
-  deriving newtype 
-    ( Functor
-    , Applicative
-    , Monad
-    , MonadIO
-    , MonadReader Env
-    , MonadState TodoRegistry
-    , MonadError AppError
-    )
+newtype App a = App {unApp :: ReaderT Env (StateT TodoRegistry (ExceptT AppError IO)) a}
+    deriving stock
+        ( Generic
+        )
+    deriving newtype
+        ( Applicative
+        , Functor
+        , Monad
+        , MonadError AppError
+        , MonadIO
+        , MonadReader Env
+        , MonadState TodoRegistry
+        )
 
 runApp :: Env -> TodoRegistry -> App a -> IO (Either AppError (a, TodoRegistry))
 runApp env reg = runExceptT . flip runStateT reg . flip runReaderT env . (^. #unApp)
 
-data AppError 
+data AppError
     = DomainE DomainError
     | EffectE EffectError
     | ParserE ParserError
-  deriving (Generic)
+    deriving (Generic)
 
 data ParserError
     = MultipleTargetsError
@@ -55,13 +59,13 @@ data ParserError
     | NoOptionsProvided
 
 instance Show ParserError where
-    show MultipleTargetsError   = "The specified target name refers to multiple tasks"
-    show TargetNotFoundError    = "The specified target name does not refer to any task"
+    show MultipleTargetsError = "The specified target name refers to multiple tasks"
+    show TargetNotFoundError = "The specified target name does not refer to any task"
     show DeletionTargetNotFound = "No target matches the deletion criteria"
-    show NoOptionsProvided      = "At least one option is required"
+    show NoOptionsProvided = "At least one option is required"
 
 instance IsError AppError where
-    displayError (DomainE x) = "[E:Logic] "  <> show x
+    displayError (DomainE x) = "[E:Logic] " <> show x
     displayError (EffectE x) = "[E:System] " <> show x
     displayError (ParserE x) = "[E:Parser] " <> show x
 
@@ -74,104 +78,112 @@ instance FromErr EffectError AppError where
 main :: IO ()
 main = do
     opts <- parseOpts
-    env  <- initEnv
-    reg  <- loadRegistry
+    env <- initEnv
+    reg <- loadRegistry
 
     either (die . displayError) (const exitSuccess) =<< runExceptT do
-        ((), reg') 
-            <- main' opts
-            &  runApp env reg
-            &  ExceptT 
+        ((), reg') <-
+            main' opts
+                & runApp env reg
+                & ExceptT
 
-        UsingCereal reg' 
-            & serialize 
+        UsingCereal reg'
+            & serialize
             & writeData
   where
     initEnv :: IO Env
     initEnv = do
         now <- getCurrentTime
-        tz  <- getCurrentTimeZone
+        tz <- getCurrentTimeZone
 
-        pure Env{ now, tz }
+        pure Env{now, tz}
 
-    loadRegistry :: MonadIO m => m TodoRegistry
-    loadRegistry 
-        =   either (const initTodoRegistry) id 
-        <$> runExceptT (readData >>= liftEitherFrom . deserialize @(UsingCereal TodoRegistry) >>= pure . (^. #unUsingCereal))
+    loadRegistry :: (MonadIO m) => m TodoRegistry
+    loadRegistry =
+        either (const initTodoRegistry) id
+            <$> runExceptT
+                ( readData
+                    >>= liftEitherFrom . deserialize @(UsingCereal TodoRegistry)
+                    >>= pure . (^. #unUsingCereal)
+                )
 
 main' :: Options -> App ()
-main' Options { optCommand } = runCommand optCommand 
+main' Options{optCommand} = runCommand optCommand
 
 runCommand :: Command -> App ()
-runCommand (Add    x) = runAddCommand    x
-runCommand (List   x) = runListCommand   x
-runCommand (Edit   x) = runEditCommand   x
-runCommand (Mark   x) = runMarkCommand   x 
+runCommand (Add x) = runAddCommand x
+runCommand (List x) = runListCommand x
+runCommand (Edit x) = runEditCommand x
+runCommand (Mark x) = runMarkCommand x
 runCommand (Delete x) = runDeleteCommand x
 
 runAddCommand :: AddCommand -> App ()
-runAddCommand AddCommand{ name, deadline, desc, tags } 
-    =   asks (^. #tz)
-    >>= \tz -> addTask EntryCreate{ name, desc, tags, deadline = localTimeToUTC tz deadline }
+runAddCommand AddCommand{name, deadline, desc, tags} =
+    asks (^. #tz)
+        >>= \tz ->
+            addTask EntryCreate{name, desc, tags, deadline = localTimeToUTC tz deadline}
 
 runListCommand :: ListCommand -> App ()
-runListCommand ListCommand{ tags, status } = do
-    Env{ tz } <- ask
-    tasks'    <- getTasksWithAllTags tags
-    tasks''   <- case status of
+runListCommand ListCommand{tags, status} = do
+    Env{tz} <- ask
+    tasks' <- getTasksWithAllTags tags
+    tasks'' <- case status of
         Nothing -> getAllTasks
-        Just s  -> case s of
-            LstDone    -> getDoneTasks
-            LstUndone  -> getUndoneTasks
-            LstDue     -> getDueTasks
+        Just s -> case s of
+            LstDone -> getDoneTasks
+            LstUndone -> getUndoneTasks
+            LstDue -> getDueTasks
             LstOverdue -> getOverdueTasks
 
-    snapshots <- S.intersection tasks' tasks'' 
-        & getTaskSnapshots 
-        & fmap sortTaskSnapshots
+    snapshots <-
+        S.intersection tasks' tasks''
+            & getTaskSnapshots
+            & fmap sortTaskSnapshots
 
     liftIO . putStrLn $ renderTable (initTaskSnapshotRenderConfig tz 0 1) snapshots
     pure ()
 
 runEditCommand :: EditCommand -> App ()
-runEditCommand EditCommand{ tgtName, name, deadline, desc, tags } = do
-    Env{ tz } <- ask
-    target    <- getUniqueTarget tgtName
+runEditCommand EditCommand{tgtName, name, deadline, desc, tags} = do
+    Env{tz} <- ask
+    target <- getUniqueTarget tgtName
 
-    editTask EntryUpdate{ name, desc, tags, deadline = (localTimeToUTC tz) <$> deadline } target 
+    editTask
+        EntryUpdate{name, desc, tags, deadline = (localTimeToUTC tz) <$> deadline}
+        target
 
 runMarkCommand :: MarkCommand -> App ()
-runMarkCommand (MrkDone   tgtName) = getUniqueTarget tgtName >>= markTask MDone
+runMarkCommand (MrkDone tgtName) = getUniqueTarget tgtName >>= markTask MDone
 runMarkCommand (MrkUndone tgtName) = getUniqueTarget tgtName >>= markTask MUndone
 
 runDeleteCommand :: DeleteCommand -> App ()
-runDeleteCommand DelAll                            = getAllTasks >>= deleteTasks
-runDeleteCommand DelBy{ byName, byTags, byStatus } = do
-    tasks'   <- traverse getTasksByNameContaining byName
-    tasks''  <- traverse getTasksWithAllTags byTags
+runDeleteCommand DelAll = getAllTasks >>= deleteTasks
+runDeleteCommand DelBy{byName, byTags, byStatus} = do
+    tasks' <- traverse getTasksByNameContaining byName
+    tasks'' <- traverse getTasksWithAllTags byTags
     tasks''' <- (`traverse` byStatus) \case
-        DelDone    -> getDoneTasks
+        DelDone -> getDoneTasks
         DelOverdue -> getOverdueTasks
 
-    tasks <- 
+    tasks <-
         [tasks', tasks'', tasks''']
             & catMaybes
             & foldr1 S.intersection
             & evaluate
             & try @ErrorCall
             & liftIO
-        >>= \case 
-            Left  _  -> throwError $ ParserE NoOptionsProvided
-            Right [] -> throwError $ ParserE DeletionTargetNotFound
-            Right xs -> pure xs
+            >>= \case
+                Left _ -> throwError $ ParserE NoOptionsProvided
+                Right [] -> throwError $ ParserE DeletionTargetNotFound
+                Right xs -> pure xs
 
     deleteTasks tasks
 
-getUniqueTarget :: (MonadRegistry m, MonadError AppError m) => Text -> m TaskId
-getUniqueTarget = getTasksByNameContaining >=> getFromSingleton 
+getUniqueTarget :: (MonadError AppError m, MonadRegistry m) => Text -> m TaskId
+getUniqueTarget = getTasksByNameContaining >=> getFromSingleton
 
 getFromSingleton :: (Foldable f, MonadError AppError m) => f a -> m a
 getFromSingleton = (. toList) \case
     [x] -> pure x
-    []  -> throwError $ ParserE TargetNotFoundError
-    _   -> throwError $ ParserE MultipleTargetsError
+    [] -> throwError $ ParserE TargetNotFoundError
+    _ -> throwError $ ParserE MultipleTargetsError
