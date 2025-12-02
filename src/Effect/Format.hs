@@ -21,15 +21,13 @@ import Data.Text qualified as T
 import Common
 import Domain (SnapshotStatus (..), TaskSnapshot (..))
 
-data Column a b
-    = Column
+data Column a b = Column
     { colName :: a
     , extractColStr :: b -> String
     }
     deriving (Generic)
 
-data RenderConfig a b
-    = RenderConfig
+data RenderConfig a b = RenderConfig
     { cols :: [Column a b]
     , vSpace :: Int
     , hSpace :: Int
@@ -77,7 +75,7 @@ renderTableWithout xs RenderConfig{..} ts =
     cols
         & filter ((`notElem` xs) . (^. #colName))
         & map (text .: (^. #extractColStr))
-        & (flip (renderTable' vSpace hSpace) ts)
+        & flip (renderTable' vSpace hSpace) ts
   where
     renderTable' :: Int -> Int -> [b -> Box] -> [b] -> String
     renderTable' vs hs = (render . hsep hs top . (vsep vs left <$>)) .: weave

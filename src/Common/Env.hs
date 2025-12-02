@@ -6,8 +6,7 @@ import Data.Time.LocalTime (TimeZone)
 
 import Common.Optics
 
-data Env
-    = Env
+data Env = Env
     { now :: !UTCTime
     , tz :: !TimeZone
     }

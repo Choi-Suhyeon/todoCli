@@ -24,6 +24,7 @@ import Data.Time.Clock (UTCTime)
 import Data.Tuple (swap)
 import GHC.Generics (Generic)
 import Lens.Micro ((%~), (&), (.~))
+import Witch
 
 import Data.HashSet qualified as S
 import Data.IntMap qualified as IM
@@ -31,13 +32,17 @@ import Data.IntSet qualified as IS
 import Data.Map qualified as M
 
 newtype Intersection a = Intersection {getIntersection :: HashSet a}
-    deriving (Generic, Show)
+    deriving stock (Eq, Generic, Show)
+    deriving newtype (Hashable)
 
 instance (Eq a, Hashable a) => Semigroup (Intersection a) where
     Intersection x <> Intersection y = Intersection (S.intersection x y)
 
-data TodoRegistry
-    = TodoRegistry
+instance From (Intersection a) (HashSet a)
+
+instance From (HashSet a) (Intersection a)
+
+data TodoRegistry = TodoRegistry
     { ids :: !Ids
     , idToTask :: !(IntMap Task)
     , tagToId :: !(Map Text (HashSet TaskId))
@@ -48,8 +53,7 @@ data TodoRegistry
 initTodoRegistry :: TodoRegistry
 initTodoRegistry = TodoRegistry initIds IM.empty M.empty M.empty
 
-data Task
-    = Task
+data Task = Task
     { name :: !Text
     , desc :: !Text
     , tags :: !(HashSet Text)
@@ -67,11 +71,14 @@ newtype TaskId = TaskId {unTaskId :: Int}
     deriving stock (Eq, Generic, Ord, Show)
     deriving newtype (Hashable)
 
+instance From Int TaskId
+
+instance From TaskId Int
+
 minTaskId :: TaskId
 minTaskId = TaskId 1
 
-data Ids
-    = Ids
+data Ids = Ids
     { next :: !TaskId
     , released :: !IntSet
     }
@@ -82,19 +89,25 @@ initIds = Ids minTaskId IS.empty
 
 allocId :: Ids -> (Ids, TaskId)
 allocId ids
-    | IS.null ids.released = (ids & #next . #unTaskId %~ succ, ids.next)
+    | IS.null ids.released =
+        (ids & #next . #unTaskId %~ succ, ids.next)
     | otherwise =
-        bimap (($ ids) . (#released .~)) TaskId . swap . IS.deleteFindMin $ ids.released
+        ids.released
+            & IS.deleteFindMin
+            & swap
+            & bimap (($ ids) . (#released .~)) TaskId
 
 releaseId :: TaskId -> Ids -> Ids
 releaseId tid ids
-    | isValidId = interim
+    | isValidId =
+        if
+            | isDoubleFreed -> ids
+            | isMaxId -> ids & #next . #unTaskId %~ pred
+            | otherwise -> ids & #released %~ IS.insert tid.unTaskId
     | otherwise = ids
   where
-    isValidId = and @[] $ [(>= minTaskId), (< ids.next)] <*> [tid]
+    isValidId, isMaxId, isDoubleFreed :: Bool
+
+    isValidId = liftA2 (&&) (>= minTaskId) (< ids.next) tid
     isMaxId = (tid & #unTaskId %~ succ) == ids.next
-    isDoubleFreed = IS.member tid.unTaskId ids.released
-    interim
-        | isDoubleFreed = ids
-        | isMaxId = ids & #next . #unTaskId %~ pred
-        | otherwise = ids & #released %~ (IS.insert tid.unTaskId)
+    isDoubleFreed = tid.unTaskId `IS.member` ids.released

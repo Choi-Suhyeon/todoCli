@@ -3,13 +3,12 @@ module Domain.Internal
     , validateDeadline
     , getTasksMatching
     , getTasksByStatus
-    , deleteFromMapSetKeys
-    , insertIntoMapSetKeysWith
+    , deleteFromSetsAtKeys
+    , insertIntoSetsAtKeysWith
     , updateIfJust
     ) where
 
 import Control.Monad.State.Strict (gets)
-import Data.Bool (bool)
 import Data.Generics.Labels ()
 import Data.HashSet (HashSet)
 import Data.Hashable (Hashable)
@@ -23,6 +22,7 @@ import Data.Time.Clock
 import Data.Time.LocalTime (TimeZone, utcToLocalTime)
 import Lens.Micro ((%~), (^.))
 import Lens.Micro.Type (ASetter, Getting)
+import Witch
 
 import Data.HashSet qualified as S
 import Data.IntMap qualified as IM
@@ -46,28 +46,28 @@ validateDeadline tz now dd
             Left $ InvalidDeadline nowL ddL
 
 getTasksMatching :: (MonadRegistry m) => (Task -> Bool) -> m (HashSet TaskId)
-getTasksMatching p =
-    gets
-        $ IM.foldrWithKey (\k -> bool id (S.insert (TaskId k)) . p) S.empty
-            . (^. #idToTask)
+getTasksMatching p = gets $ IM.foldrWithKey insertKeyWhen S.empty . (^. #idToTask)
+  where
+    insertKeyWhen :: Int -> Task -> HashSet TaskId -> HashSet TaskId
+    insertKeyWhen key task set
+        | p task = S.insert (into key) set
+        | otherwise = set
 
 getTasksByStatus :: (MonadRegistry m) => TaskStatus -> m (HashSet TaskId)
-getTasksByStatus s = gets $ M.findWithDefault S.empty s . (^. #statusToId)
+getTasksByStatus = gets . (. (^. #statusToId)) . M.findWithDefault S.empty
 
-deleteFromMapSetKeys
-    :: (Foldable t, Hashable a, Ord k)
-    => a -> t k -> Map k (HashSet a) -> Map k (HashSet a)
-deleteFromMapSetKeys val = flip $ foldr $ M.adjust (S.delete val)
+deleteFromSetsAtKeys
+    :: (Foldable t, Hashable a, Ord k) => a -> t k -> Map k (HashSet a) -> Map k (HashSet a)
+deleteFromSetsAtKeys = flip . foldr . M.adjust . S.delete
 
-insertIntoMapSetKeysWith
+insertIntoSetsAtKeysWith
     :: (Foldable t, Hashable a, Ord k)
     => (HashSet a -> HashSet a -> HashSet a)
     -> a
     -> t k
     -> Map k (HashSet a)
     -> Map k (HashSet a)
-insertIntoMapSetKeysWith f val = flip $ foldr \k -> M.insertWith f k (S.singleton val)
+insertIntoSetsAtKeysWith f val ks m = foldr (\k -> M.insertWith f k (S.singleton val)) m ks
 
-updateIfJust
-    :: Getting (Maybe a) s1 (Maybe a) -> ASetter s2 t a a -> s1 -> s2 -> t
-updateIfJust getL overL new = overL %~ flip fromMaybe (new ^. getL)
+updateIfJust :: Getting (Maybe a) s1 (Maybe a) -> ASetter s2 t a a -> s1 -> s2 -> t
+updateIfJust getL overL new = overL %~ (`fromMaybe` (new ^. getL))

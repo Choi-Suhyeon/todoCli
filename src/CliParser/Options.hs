@@ -19,7 +19,7 @@ import Data.Text qualified as T
 
 import Common
 
-data Options = Options {optCommand :: Command}
+newtype Options = Options {optCommand :: Command}
     deriving (Generic, Show)
 
 data Command
@@ -30,8 +30,7 @@ data Command
     | Delete DeleteCommand
     deriving (Generic, Show)
 
-data AddCommand
-    = AddCommand
+data AddCommand = AddCommand
     { name :: Text
     , deadline :: LocalTime
     , desc :: Text
@@ -39,15 +38,13 @@ data AddCommand
     }
     deriving (Generic, Show)
 
-data ListCommand
-    = ListCommand
+data ListCommand = ListCommand
     { tags :: HashSet Text
     , status :: Maybe ListStatus
     }
     deriving (Generic, Show)
 
-data EditCommand
-    = EditCommand
+data EditCommand = EditCommand
     { tgtName :: Text
     , name :: Maybe Text
     , desc :: Maybe Text

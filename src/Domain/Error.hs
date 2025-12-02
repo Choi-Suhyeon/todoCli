@@ -3,10 +3,9 @@ module Domain.Error (MonadDomainError, DomainError (..)) where
 import Control.Monad.Except (MonadError (..))
 import Data.Time.Format.ISO8601 (iso8601Show)
 import Data.Time.LocalTime (LocalTime)
+import Witch
 
-import Common (FromErr)
-
-type MonadDomainError e m = (MonadError e m, FromErr DomainError e)
+type MonadDomainError e m = (MonadError e m, From DomainError e)
 
 data DomainError
     = EmptyTitle

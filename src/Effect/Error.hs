@@ -1,10 +1,9 @@
 module Effect.Error (MonadEffectError, EffectError (..)) where
 
 import Control.Monad.Except (MonadError (..))
+import Witch
 
-import Common (FromErr)
-
-type MonadEffectError e m = (MonadError e m, FromErr EffectError e)
+type MonadEffectError e m = (MonadError e m, From EffectError e)
 
 data EffectError
     = GettingDataDirectoryFailed

@@ -1,36 +1,29 @@
 module Common.AbstractError
-    ( IsError (..)
-    , FromErr (..)
-    , throwErrorFrom
-    , liftEitherFrom
+    ( throwErrorInto
+    , liftEitherInto
     , liftEitherWith
     , liftEitherAs
     ) where
 
 import Control.Monad.Except (MonadError (..))
 import Data.Bifunctor (first)
+import Witch
 
-class IsError e where
-    displayError :: e -> String
+throwErrorInto :: forall e t m a. (From t e, MonadError e m) => t -> m a
+throwErrorInto = throwError . into
+{-# INLINE throwErrorInto #-}
 
-class (IsError e) => FromErr t e | t -> e where
-    fromErr :: t -> e
-
-throwErrorFrom :: forall e t m a. (FromErr t e, MonadError e m) => t -> m a
-throwErrorFrom = throwError . fromErr
-{-# INLINE throwErrorFrom #-}
-
-liftEitherFrom
-    :: forall e t m a. (FromErr t e, MonadError e m) => Either t a -> m a
-liftEitherFrom = either throwErrorFrom pure
-{-# INLINE liftEitherFrom #-}
+liftEitherInto
+    :: forall e t m a. (From t e, MonadError e m) => Either t a -> m a
+liftEitherInto = either throwErrorInto pure
+{-# INLINE liftEitherInto #-}
 
 liftEitherWith
-    :: forall e t b m a. (FromErr t e, MonadError e m) => (b -> t) -> Either b a -> m a
-liftEitherWith = (liftEitherFrom .) . first
+    :: forall e t b m a. (From t e, MonadError e m) => (b -> t) -> Either b a -> m a
+liftEitherWith = (liftEitherInto .) . first
 {-# INLINE liftEitherWith #-}
 
 liftEitherAs
-    :: forall e t b m a. (FromErr t e, MonadError e m) => t -> Either b a -> m a
+    :: forall e t b m a. (From t e, MonadError e m) => t -> Either b a -> m a
 liftEitherAs = liftEitherWith . const
 {-# INLINE liftEitherAs #-}

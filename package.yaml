@@ -1,14 +1,14 @@
-name:                todoCli
-version:             0.1.0.0
-github:              "githubuser/todoCli"
-license:             BSD-3-Clause
-author:              "Author name here"
-maintainer:          "example@example.com"
-copyright:           "2025 Author name here"
+name: todoCli
+version: 0.1.0.0
+github: "githubuser/todoCli"
+license: BSD-3-Clause
+author: "Author name here"
+maintainer: "example@example.com"
+copyright: "2025 Author name here"
 
 extra-source-files:
-- README.md
-- CHANGELOG.md
+  - README.md
+  - CHANGELOG.md
 
 # Metadata used when publishing your package
 # synopsis:            Short description of your package
@@ -17,78 +17,41 @@ extra-source-files:
 # To avoid duplicated efforts in documentation and dealing with the
 # complications of embedding Haddock markup inside cabal files, it is
 # common to point users to the README.md file.
-description:         Please see the README on GitHub at <https://github.com/githubuser/todoCli#readme>
+description: Please see the README on GitHub at <https://github.com/githubuser/todoCli#readme>
 
 dependencies:
-- base >= 4.7 && < 5
-- optparse-applicative
-- unordered-containers
-- generic-lens
-- transformers
-- regex-tdfa
-- bytestring
-- containers
-- microlens
-- directory
-- filepath
-- hashable
-- cereal
-- boxes
-- text
-- time
-- mtl
+  - base
+  - optparse-applicative
+  - unordered-containers
+  - generic-lens
+  - transformers
+  - regex-tdfa
+  - bytestring
+  - containers
+  - microlens
+  - directory
+  - filepath
+  - hashable
+  - cereal
+  - witch
+  - boxes
+  - text
+  - time
+  - mtl
 
 ghc-options:
-- -Wall
-- -Wcompat
-- -Widentities
-- -Wincomplete-record-updates
-- -Wincomplete-uni-patterns
-- -Wmissing-export-lists
-- -Wmissing-home-modules
-- -Wredundant-constraints
+  - -Wall
+  - -Wcompat
+  - -Widentities
+  - -Wincomplete-record-updates
+  - -Wincomplete-uni-patterns
+  - -Wmissing-export-lists
+  - -Wmissing-home-modules
+  - -Wredundant-constraints
 
 library:
   source-dirs: src
   default-extensions:
-  - ImportQualifiedPost
-  - OverloadedStrings
-  - OverloadedLists
-  - BlockArguments
-  - TupleSections
-  - BangPatterns
-  - LambdaCase
-  - DuplicateRecordFields
-  - OverloadedRecordDot
-  - OverloadedLabels
-  - NoFieldSelectors
-  - RecordWildCards
-  - NamedFieldPuns
-  - FlexibleContexts
-  - TypeApplications
-  - DeriveGeneric
-  - DataKinds
-  - DeriveAnyClass
-  - ConstraintKinds
-  - StandaloneDeriving
-  - ScopedTypeVariables
-  - MultiWayIf
-  - GeneralizedNewtypeDeriving
-  - DerivingStrategies
-  - MultiParamTypeClasses
-  - FunctionalDependencies
-
-executables:
-  todoCli-exe:
-    main:                Main.hs
-    source-dirs:         app
-    ghc-options:
-    - -threaded
-    - -rtsopts
-    - -with-rtsopts=-N
-    dependencies:
-    - todoCli
-    default-extensions:
     - ImportQualifiedPost
     - OverloadedStrings
     - OverloadedLists
@@ -116,13 +79,51 @@ executables:
     - MultiParamTypeClasses
     - FunctionalDependencies
 
+executables:
+  todoCli-exe:
+    main: Main.hs
+    source-dirs: app
+    ghc-options:
+      - -threaded
+      - -rtsopts
+      - -with-rtsopts=-N
+    dependencies:
+      - todoCli
+    default-extensions:
+      - ImportQualifiedPost
+      - OverloadedStrings
+      - OverloadedLists
+      - BlockArguments
+      - TupleSections
+      - BangPatterns
+      - LambdaCase
+      - DuplicateRecordFields
+      - OverloadedRecordDot
+      - OverloadedLabels
+      - NoFieldSelectors
+      - RecordWildCards
+      - NamedFieldPuns
+      - FlexibleContexts
+      - TypeApplications
+      - DeriveGeneric
+      - DataKinds
+      - DeriveAnyClass
+      - ConstraintKinds
+      - StandaloneDeriving
+      - ScopedTypeVariables
+      - MultiWayIf
+      - GeneralizedNewtypeDeriving
+      - DerivingStrategies
+      - MultiParamTypeClasses
+      - FunctionalDependencies
+
 tests:
   todoCli-test:
-    main:                Spec.hs
-    source-dirs:         test
+    main: Spec.hs
+    source-dirs: test
     ghc-options:
-    - -threaded
-    - -rtsopts
-    - -with-rtsopts=-N
+      - -threaded
+      - -rtsopts
+      - -with-rtsopts=-N
     dependencies:
-    - todoCli
+      - todoCli

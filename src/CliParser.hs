@@ -2,6 +2,7 @@ module CliParser (module CliParser.Options, parseOpts) where
 
 import Control.Applicative (optional, (<**>), (<|>))
 import Control.Monad (mfilter)
+import Data.Bool (bool)
 import Data.HashSet (HashSet)
 import Data.Text (Text)
 import Data.Time.Calendar (Day (..))
@@ -57,7 +58,7 @@ opts =
         $ fullDesc
             <> progDesc
                 "Organize and track tasks from the command line with commands to add, list, edit, mark, rename, and delete."
-            <> header (progName ++ " - A simple command-line task manager")
+            <> header (progName <> " - A simple command-line task manager")
 
 progName :: String
 progName = "todoCli"
@@ -318,16 +319,10 @@ pDeleteCommand =
                 <> help "Filter by task status (done or overdue)"
 
 nameReader :: ReadM Text
-nameReader = maybeReader \s ->
-    if
-        | length s <= 30 -> Just $ T.pack s
-        | otherwise -> Nothing
+nameReader = maybeReader $ liftA2 (bool Nothing) (Just . T.pack) ((<= 30) . length)
 
 descReader :: ReadM Text
-descReader = maybeReader \s ->
-    if
-        | length s <= 60 -> Just $ T.pack s
-        | otherwise -> Nothing
+descReader = maybeReader $ liftA2 (bool Nothing) (Just . T.pack) ((<= 60) . length)
 
 datetimeReader :: ReadM LocalTime
 datetimeReader =
@@ -337,20 +332,18 @@ datetimeReader =
             <*> iso8601ParseM
   where
     fromDayToLocalTime :: Day -> LocalTime
-    fromDayToLocalTime = flip LocalTime $ TimeOfDay 23 59 59
+    fromDayToLocalTime = (`LocalTime` TimeOfDay 23 59 59)
 
 textSetReader :: ReadM (HashSet Text)
 textSetReader =
     maybeReader
-        $ checkSet'sLenValid
-            . fmap (S.filter (not . T.null) . S.fromList . T.splitOn " ")
-            . checkComponentValid
-            . pure
-            . T.toUpper
-            . T.pack
+        $ mfilter isValidSetLen . fmap uniqueWords . mfilter isValidFormat . pure . T.toUpper . T.pack
   where
-    checkComponentValid :: Maybe Text -> Maybe Text
-    checkComponentValid = mfilter (=~ ("^ *[A-Z]{1,10}( +[A-Z]{1,10})* *$" :: Text))
+    isValidFormat :: Text -> Bool
+    isValidFormat = (=~ ("^ *[A-Z]{1,10}( +[A-Z]{1,10})* *$" :: Text))
 
-    checkSet'sLenValid :: Maybe (HashSet Text) -> Maybe (HashSet Text)
-    checkSet'sLenValid = mfilter $ liftA2 (&&) (> 0) (<= 4) . length
+    isValidSetLen :: HashSet a -> Bool
+    isValidSetLen = liftA2 (&&) (> 0) (<= 4) . length
+
+    uniqueWords :: Text -> HashSet Text
+    uniqueWords = S.filter (not . T.null) . S.fromList . T.splitOn " "

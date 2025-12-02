@@ -11,14 +11,16 @@ import Control.Monad.Except
     , throwError
     )
 import Control.Monad.IO.Class (MonadIO (..))
-import Control.Monad.Reader (MonadReader, ReaderT, ask, asks, runReaderT)
+import Control.Monad.Reader (MonadReader, ReaderT, ask, runReaderT)
 import Control.Monad.State.Strict (MonadState, StateT, runStateT)
+import Data.Either (fromRight)
 import Data.Foldable (Foldable (..), foldr1)
 import Data.Maybe (catMaybes)
 import Data.Text (Text)
 import Data.Time.Clock (getCurrentTime)
 import Data.Time.LocalTime (getCurrentTimeZone, localTimeToUTC)
 import System.Exit (die, exitSuccess)
+import Witch
 import Prelude hiding (Foldable (..))
 
 import Data.HashSet qualified as S
@@ -64,16 +66,16 @@ instance Show ParserError where
     show DeletionTargetNotFound = "No target matches the deletion criteria"
     show NoOptionsProvided = "At least one option is required"
 
-instance IsError AppError where
-    displayError (DomainE x) = "[E:Logic] " <> show x
-    displayError (EffectE x) = "[E:System] " <> show x
-    displayError (ParserE x) = "[E:Parser] " <> show x
+instance Show AppError where
+    show (DomainE x) = "[E:Logic] " <> show x
+    show (EffectE x) = "[E:System] " <> show x
+    show (ParserE x) = "[E:Parser] " <> show x
 
-instance FromErr DomainError AppError where
-    fromErr = DomainE
+instance From DomainError AppError where
+    from = DomainE
 
-instance FromErr EffectError AppError where
-    fromErr = EffectE
+instance From EffectError AppError where
+    from = EffectE
 
 main :: IO ()
 main = do
@@ -81,7 +83,7 @@ main = do
     env <- initEnv
     reg <- loadRegistry
 
-    either (die . displayError) (const exitSuccess) =<< runExceptT do
+    either (die . show) (const exitSuccess) =<< runExceptT do
         ((), reg') <-
             main' opts
                 & runApp env reg
@@ -100,12 +102,14 @@ main = do
 
     loadRegistry :: (MonadIO m) => m TodoRegistry
     loadRegistry =
-        either (const initTodoRegistry) id
-            <$> runExceptT
-                ( readData
-                    >>= liftEitherFrom . deserialize @(UsingCereal TodoRegistry)
-                    >>= pure . (^. #unUsingCereal)
-                )
+        fromRight initTodoRegistry <$> runExceptT do
+            raw <- readData
+            UsingCereal reg <-
+                raw
+                    & deserialize @(UsingCereal TodoRegistry)
+                    & liftEitherInto @AppError
+
+            pure reg
 
 main' :: Options -> App ()
 main' Options{optCommand} = runCommand optCommand
@@ -119,9 +123,7 @@ runCommand (Delete x) = runDeleteCommand x
 
 runAddCommand :: AddCommand -> App ()
 runAddCommand AddCommand{name, deadline, desc, tags} =
-    asks (^. #tz)
-        >>= \tz ->
-            addTask EntryCreate{name, desc, tags, deadline = localTimeToUTC tz deadline}
+    ask >>= \Env{tz} -> addTask EntryCreate{name, desc, tags, deadline = localTimeToUTC tz deadline}
 
 runListCommand :: ListCommand -> App ()
 runListCommand ListCommand{tags, status} = do
@@ -149,7 +151,7 @@ runEditCommand EditCommand{tgtName, name, deadline, desc, tags} = do
     target <- getUniqueTarget tgtName
 
     editTask
-        EntryUpdate{name, desc, tags, deadline = (localTimeToUTC tz) <$> deadline}
+        EntryUpdate{name, desc, tags, deadline = localTimeToUTC tz <$> deadline}
         target
 
 runMarkCommand :: MarkCommand -> App ()

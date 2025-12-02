@@ -33,7 +33,6 @@ library
       Common.Optics
       Common.Util
       Domain
-      Domain.Adapter
       Domain.Error
       Domain.Internal
       Domain.Serialization
@@ -78,7 +77,7 @@ library
       FunctionalDependencies
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wredundant-constraints
   build-depends:
-      base >=4.7 && <5
+      base
     , boxes
     , bytestring
     , cereal
@@ -95,6 +94,7 @@ library
     , time
     , transformers
     , unordered-containers
+    , witch
   default-language: Haskell2010
 
 executable todoCli-exe
@@ -134,7 +134,7 @@ executable todoCli-exe
       FunctionalDependencies
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
   build-depends:
-      base >=4.7 && <5
+      base
     , boxes
     , bytestring
     , cereal
@@ -152,6 +152,7 @@ executable todoCli-exe
     , todoCli
     , transformers
     , unordered-containers
+    , witch
   default-language: Haskell2010
 
 test-suite todoCli-test
@@ -165,7 +166,7 @@ test-suite todoCli-test
       test
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
   build-depends:
-      base >=4.7 && <5
+      base
     , boxes
     , bytestring
     , cereal
@@ -183,4 +184,5 @@ test-suite todoCli-test
     , todoCli
     , transformers
     , unordered-containers
+    , witch
   default-language: Haskell2010
