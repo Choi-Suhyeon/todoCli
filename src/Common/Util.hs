@@ -1,7 +1,5 @@
 module Common.Util (tee, teeM, (>!), (.:), weave) where
 
-import Data.Functor ((<&>))
-
 infixl 1 >!
 infixr 9 .:
 
@@ -18,4 +16,4 @@ teeM = (=<<) . tee
 f .: g = (f .) . g
 
 weave :: (Functor f1, Functor f2) => f1 (a -> b) -> f2 a -> f1 (f2 b)
-weave = flip $ (<$>) . (<&>)
+weave fs xs = (<$> xs) <$> fs

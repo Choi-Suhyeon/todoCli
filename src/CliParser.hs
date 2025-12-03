@@ -1,46 +1,14 @@
 module CliParser (module CliParser.Options, parseOpts) where
 
-import Control.Applicative (optional, (<**>), (<|>))
 import Control.Monad (mfilter)
 import Data.Bool (bool)
 import Data.HashSet (HashSet)
 import Data.Text (Text)
 import Data.Time.Calendar (Day (..))
-import Data.Time.Format.ISO8601
-    ( calendarFormat
-    , iso8601ParseM
-    , parseFormatExtension
-    )
+import Data.Time.Format.ISO8601 (calendarFormat, iso8601ParseM, parseFormatExtension)
 import Data.Time.LocalTime (LocalTime (..), TimeOfDay (..))
 import Data.Version (showVersion)
 import Options.Applicative
-    ( Parser
-    , ParserInfo
-    , ReadM
-    , auto
-    , command
-    , execParser
-    , fullDesc
-    , header
-    , help
-    , helper
-    , hidden
-    , hsubparser
-    , info
-    , infoOption
-    , long
-    , maybeReader
-    , metavar
-    , option
-    , parserFailure
-    , progDesc
-    , renderFailure
-    , short
-    , simpleVersioner
-    , strArgument
-    , value
-    )
-import Options.Applicative.Builder (ParseError (..), columns, prefs)
 import Text.Regex.TDFA ((=~))
 
 import Data.HashSet qualified as S
@@ -140,34 +108,36 @@ longHelpOpt =
             ]
 
 pOptions :: Parser Options
-pOptions = Options <$> pCommand
+pOptions = Options <$> pCommand <*> pVerbose
+
+pVerbose :: Parser Bool
+pVerbose =
+    switch
+        $ short 'v'
+            <> long "verbose"
+            <> help "Show verbose logs during processing"
 
 pCommand :: Parser Command
-pCommand =
-    hsubparser
-        $ command
-            "add"
-            ( info (Add <$> pAddCommand)
-                $ progDesc "Add a new task with name, description, deadline, and optional tags"
-            )
-            <> command
-                "list"
-                ( info (List <$> pListCommand)
-                    $ progDesc "List tasks filtered by status or tags"
-                )
-            <> command
-                "edit"
-                ( info (Edit <$> pEditCommand)
-                    $ progDesc "Edit the properties of an existing task"
-                )
-            <> command
-                "mark"
-                (info (Mark <$> pMarkCommand) $ progDesc "Mark a task as done or undone")
-            <> command
-                "delete"
-                ( info (Delete <$> pDeleteCommand)
-                    $ progDesc "Delete tasks by name, status, or tags"
-                )
+pCommand = hsubparser $ cAdd <> cList <> cEdit <> cMark <> cDelete
+  where
+    cAdd, cList, cEdit, cMark, cDelete :: Mod CommandFields Command
+
+    cAdd =
+        command "add"
+            $ info (Add <$> pAddCommand)
+            $ progDesc "Add a new task with name, description, deadline, and optional tags"
+
+    cList = command "list" $ info (List <$> pListCommand) $ progDesc "List tasks filtered by status or tags"
+
+    cEdit =
+        command "edit" $ info (Edit <$> pEditCommand) $ progDesc "Edit the properties of an existing task"
+
+    cMark = command "mark" $ info (Mark <$> pMarkCommand) $ progDesc "Mark a task as done or undone"
+
+    cDelete =
+        command "delete"
+            $ info (Delete <$> pDeleteCommand)
+            $ progDesc "Delete tasks by name, status, or tags"
 
 pAddCommand :: Parser AddCommand
 pAddCommand = AddCommand <$> pName <*> pDeadline <*> pDesc <*> pTags

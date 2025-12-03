@@ -4,25 +4,23 @@ module Main (main) where
 
 import Control.Exception (ErrorCall, evaluate, try)
 import Control.Monad ((>=>))
-import Control.Monad.Except
-    ( ExceptT (..)
-    , MonadError
-    , runExceptT
-    , throwError
-    )
+import Control.Monad.Except (ExceptT (..), MonadError, runExceptT, throwError)
 import Control.Monad.IO.Class (MonadIO (..))
 import Control.Monad.Reader (MonadReader, ReaderT, ask, runReaderT)
 import Control.Monad.State.Strict (MonadState, StateT, runStateT)
+import Control.Monad.Writer.Strict (MonadWriter, WriterT, runWriterT, censor)
 import Data.Either (fromRight)
 import Data.Foldable (Foldable (..), foldr1)
-import Data.Maybe (catMaybes)
+import Data.Maybe (catMaybes, maybeToList)
+import Data.Bool (bool)
 import Data.Text (Text)
 import Data.Time.Clock (getCurrentTime)
 import Data.Time.LocalTime (getCurrentTimeZone, localTimeToUTC)
-import System.Exit (die, exitSuccess)
+import System.Exit (exitSuccess, exitFailure)
 import Witch
 import Prelude hiding (Foldable (..))
 
+import Data.Text.IO qualified as TIO
 import Data.HashSet qualified as S
 
 import CliParser
@@ -31,7 +29,7 @@ import Domain
 import Domain.Serialization
 import Effect
 
-newtype App a = App {unApp :: ReaderT Env (StateT TodoRegistry (ExceptT AppError IO)) a}
+newtype App a = App {unApp :: ReaderT Env (StateT TodoRegistry (ExceptT AppError (WriterT Log IO))) a}
     deriving stock
         ( Generic
         )
@@ -42,11 +40,12 @@ newtype App a = App {unApp :: ReaderT Env (StateT TodoRegistry (ExceptT AppError
         , MonadError AppError
         , MonadIO
         , MonadReader Env
+        , MonadWriter Log
         , MonadState TodoRegistry
         )
 
-runApp :: Env -> TodoRegistry -> App a -> IO (Either AppError (a, TodoRegistry))
-runApp env reg = runExceptT . flip runStateT reg . flip runReaderT env . (^. #unApp)
+runApp :: Env -> TodoRegistry -> App a -> IO (Either AppError (a, TodoRegistry), Log)
+runApp env reg = runWriterT . runExceptT . flip runStateT reg . flip runReaderT env . (^. #unApp)
 
 data AppError
     = DomainE DomainError
@@ -82,16 +81,16 @@ main = do
     opts <- parseOpts
     env <- initEnv
     reg <- loadRegistry
+    (intermediate, logs) <- main' opts & runApp env reg
+    result <- runExceptT (ExceptT (pure intermediate) >>= writeData . serialize . UsingCereal . snd)
 
-    either (die . show) (const exitSuccess) =<< runExceptT do
-        ((), reg') <-
-            main' opts
-                & runApp env reg
-                & ExceptT
+    let
+        printLogsEndedWith :: Maybe Text -> IO ()
+        printLogsEndedWith = TIO.putStr . foldMap id . (logs <>) . into . maybeToList
 
-        UsingCereal reg'
-            & serialize
-            & writeData
+    case result of
+        Right () -> printLogsEndedWith Nothing *> exitSuccess
+        Left e -> printLogsEndedWith (show e & into & (<> "\n") & Just) *> exitFailure
   where
     initEnv :: IO Env
     initEnv = do
@@ -104,15 +103,14 @@ main = do
     loadRegistry =
         fromRight initTodoRegistry <$> runExceptT do
             raw <- readData
-            UsingCereal reg <-
-                raw
-                    & deserialize @(UsingCereal TodoRegistry)
-                    & liftEitherInto @AppError
+            UsingCereal reg <- raw
+                & deserialize @(UsingCereal TodoRegistry)
+                & liftEitherInto @AppError
 
             pure reg
 
 main' :: Options -> App ()
-main' Options{optCommand} = runCommand optCommand
+main' Options{optCommand, verbose} = censor (bool (const mempty) id verbose) $ runCommand optCommand
 
 runCommand :: Command -> App ()
 runCommand (Add x) = runAddCommand x

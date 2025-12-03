@@ -19,7 +19,10 @@ import Data.Text qualified as T
 
 import Common
 
-newtype Options = Options {optCommand :: Command}
+data Options = Options
+    { optCommand :: Command
+    , verbose :: Bool
+    }
     deriving (Generic, Show)
 
 data Command

@@ -5,12 +5,12 @@ cabal-version: 2.2
 -- see: https://github.com/sol/hpack
 
 name:           todoCli
-version:        0.1.0.0
+version:        0.2.0
 description:    Please see the README on GitHub at <https://github.com/githubuser/todoCli#readme>
 homepage:       https://github.com/githubuser/todoCli#readme
 bug-reports:    https://github.com/githubuser/todoCli/issues
-author:         Author name here
-maintainer:     example@example.com
+author:         SUHYEON CHOI
+maintainer:     1AzyF0x@protonmail.ch
 copyright:      2025 Author name here
 license:        BSD-3-Clause
 license-file:   LICENSE
@@ -35,6 +35,7 @@ library
       Domain
       Domain.Error
       Domain.Internal
+      Domain.Log
       Domain.Serialization
       Domain.Type
       Domain.Type.Internal

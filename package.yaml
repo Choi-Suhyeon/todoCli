@@ -1,9 +1,9 @@
 name: todoCli
-version: 0.1.0.0
+version: 0.2.0
 github: "githubuser/todoCli"
 license: BSD-3-Clause
-author: "Author name here"
-maintainer: "example@example.com"
+author: "SUHYEON CHOI"
+maintainer: "1AzyF0x@protonmail.ch"
 copyright: "2025 Author name here"
 
 extra-source-files:

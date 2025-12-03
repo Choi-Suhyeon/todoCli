@@ -1,6 +1,7 @@
 module Domain
     ( module Domain.Error
     , module Domain.Type
+    , module Domain.Log
     , TaskSnapshot (..)
     , EntryCreate (..)
     , EntryUpdate (..)
@@ -20,15 +21,16 @@ module Domain
     , getTaskSnapshots
     ) where
 
-import Control.Monad (when)
+import Control.Monad (when, (<=<))
 import Control.Monad.Reader (ask, asks)
 import Control.Monad.State.Strict (MonadState (..), gets, modify')
+import Data.Foldable (for_)
 import Data.Function (on)
 import Data.HashSet (HashSet)
 import Data.List.NonEmpty (NonEmpty (..))
-import Data.Maybe (mapMaybe)
+import Data.Maybe (fromJust, isJust, mapMaybe)
 import Data.Text (Text)
-import Data.Time.Clock (UTCTime, addUTCTime)
+import Data.Time.Clock (UTCTime)
 import Witch
 
 import Data.HashSet qualified as S
@@ -39,6 +41,7 @@ import Data.Text qualified as T
 import Common
 import Domain.Error
 import Domain.Internal
+import Domain.Log
 import Domain.Type
 import Domain.Type.Internal
 
@@ -61,7 +64,11 @@ data SnapshotStatus
 data MarkStatus
     = MDone
     | MUndone
-    deriving (Generic, Show)
+    deriving (Generic)
+
+instance Show MarkStatus where
+    show MDone = "done"
+    show MUndone = "undone"
 
 instance From MarkStatus TaskStatus where
     from MDone = Done
@@ -123,7 +130,7 @@ getOverdueTasks = asks (^. #now) >>= getTasksUndoneAnd . isOverdue
 getDueTasks :: (MonadEnv m, MonadRegistry m) => m (HashSet TaskId)
 getDueTasks = asks (^. #now) >>= getTasksUndoneAnd . isDue
 
-addTask :: (MonadDomainError e m, MonadEnv m, MonadRegistry m) => EntryCreate -> m ()
+addTask :: (MonadDomainError e m, MonadEnv m, MonadLog m, MonadRegistry m) => EntryCreate -> m ()
 addTask e = do
     Env{..} <- ask
     (ids', tid) <- gets (allocId . (^. #ids))
@@ -135,7 +142,12 @@ addTask e = do
             . (#statusToId %~ insertIntoSetsAtKeysWith (<>) tid (Undone :| []))
             . (#tagToId %~ insertIntoSetsAtKeysWith (<>) tid e.tags)
             . (#idToTask %~ IM.insert tid.unTaskId newTask)
+
+    msg <- renderTaskDetail newTask
+
+    logMsg $ "task added:\n" <> msg
   where
+    newTask :: Task
     newTask =
         Task
             { name = e.name
@@ -146,7 +158,7 @@ addTask e = do
             }
 
 editTask
-    :: (MonadDomainError e m, MonadEnv m, MonadRegistry m)
+    :: (MonadDomainError e m, MonadEnv m, MonadLog m, MonadRegistry m)
     => EntryUpdate
     -> TaskId
     -> m ()
@@ -157,7 +169,12 @@ editTask e tid = do
 
     gets ((IM.!? from tid) . (^. #idToTask)) >>= \case
         Nothing -> throwErrorInto TaskNotFound
-        Just old ->
+        Just old -> do
+            msgForOld <- renderTaskDetail old
+            msgForNew <- renderTaskDetail newTask
+
+            logMsg $ "task updated:\n  (old)\n" <> msgForOld <> "\n  (new)\n" <> msgForNew
+
             modify'
                 $ (#idToTask %~ IM.insert tid.unTaskId newTask)
                     . (#tagToId %~ maybe id updateTags e.tags)
@@ -172,16 +189,32 @@ editTask e tid = do
             updateTags ts =
                 insertIntoSetsAtKeysWith (<>) tid ts . deleteFromSetsAtKeys tid old.tags
 
-markTask :: (MonadRegistry m) => MarkStatus -> TaskId -> m ()
+markTask :: (MonadLog m, MonadRegistry m) => MarkStatus -> TaskId -> m ()
 markTask s tid = do
-    exists <- gets $ IM.member tid.unTaskId . (^. #idToTask)
+    reg@TodoRegistry{idToTask} <- get
 
-    when exists . modify'
-        $ (#idToTask %~ IM.adjust (#status .~ into s) tid.unTaskId)
-            . (#statusToId %~ M.insertWith S.union (into s) (S.singleton tid) . M.map (S.delete tid))
+    when (IM.member (into tid) idToTask) do
+        let
+            msg =
+                "task marked " <> (show s & into & T.toLower) <> ": '" <> (idToTask IM.! (into tid)) ^. #name <> "'"
+            reg' =
+                reg
+                    & (#statusToId %~ M.insertWith S.union (into s) (S.singleton tid) . M.map (S.delete tid))
+                    & (#idToTask %~ IM.adjust (#status .~ into s) tid.unTaskId)
 
-deleteTasks :: (MonadRegistry m) => HashSet TaskId -> m ()
-deleteTasks = modify' . flip (S.foldl' go)
+        logMsg msg
+        put reg'
+
+deleteTasks :: (MonadEnv m, MonadLog m, MonadRegistry m) => HashSet TaskId -> m ()
+deleteTasks taskIds = do
+    TodoRegistry{..} <- get
+
+    for_ taskIds \tid ->
+        idToTask
+            & IM.lookup (into tid)
+            & liftA2 when isJust ((logMsg . ("task deleted: " <>) <=< renderTaskSummary) . fromJust)
+
+    modify' $ flip (S.foldl' go) taskIds
   where
     go :: TodoRegistry -> TaskId -> TodoRegistry
     go original@TodoRegistry{..} tid = go' original
@@ -222,9 +255,3 @@ getTaskSnapshots tids = do
                     | isOverdue now deadline -> SOverdue
                     | otherwise -> SUndone
             }
-
-isDue :: UTCTime -> UTCTime -> Bool
-isDue now = liftA2 (&&) (> now) (<= addUTCTime statusDueThreshold now)
-
-isOverdue :: UTCTime -> UTCTime -> Bool
-isOverdue now = (<= now)

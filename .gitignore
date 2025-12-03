@@ -37,3 +37,4 @@ cabal.config
 
 *.tmp
 *.temp
+todo*

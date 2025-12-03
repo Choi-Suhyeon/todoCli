@@ -6,19 +6,18 @@ module Domain.Internal
     , deleteFromSetsAtKeys
     , insertIntoSetsAtKeysWith
     , updateIfJust
+    , isDue
+    , isOverdue
     ) where
 
 import Control.Monad.State.Strict (gets)
+import Data.Fixed (Pico)
 import Data.Generics.Labels ()
 import Data.HashSet (HashSet)
 import Data.Hashable (Hashable)
 import Data.Map (Map)
 import Data.Maybe (fromMaybe)
-import Data.Time.Clock
-    ( NominalDiffTime
-    , UTCTime
-    , secondsToNominalDiffTime
-    )
+import Data.Time.Clock (NominalDiffTime, UTCTime, addUTCTime)
 import Data.Time.LocalTime (TimeZone, utcToLocalTime)
 import Lens.Micro ((%~), (^.))
 import Lens.Micro.Type (ASetter, Getting)
@@ -33,7 +32,7 @@ import Domain.Type
 import Domain.Type.Internal
 
 statusDueThreshold :: NominalDiffTime
-statusDueThreshold = secondsToNominalDiffTime $ 48 * 3600
+statusDueThreshold = from @Pico $ 48 * 3600
 
 validateDeadline :: TimeZone -> UTCTime -> UTCTime -> Either DomainError ()
 validateDeadline tz now dd
@@ -71,3 +70,9 @@ insertIntoSetsAtKeysWith f val ks m = foldr (\k -> M.insertWith f k (S.singleton
 
 updateIfJust :: Getting (Maybe a) s1 (Maybe a) -> ASetter s2 t a a -> s1 -> s2 -> t
 updateIfJust getL overL new = overL %~ (`fromMaybe` (new ^. getL))
+
+isDue :: UTCTime -> UTCTime -> Bool
+isDue now = liftA2 (&&) (> now) (<= addUTCTime statusDueThreshold now)
+
+isOverdue :: UTCTime -> UTCTime -> Bool
+isOverdue now = (<= now)
