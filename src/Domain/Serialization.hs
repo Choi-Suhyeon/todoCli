@@ -15,14 +15,14 @@ import Data.Time.Clock.POSIX
     , posixSecondsToUTCTime
     , utcTimeToPOSIXSeconds
     )
-import GHC.Generics (Generic)
-import Lens.Micro ((^.))
 
 import Data.HashSet qualified as S
 import Data.Text qualified as T
 
+import Common.Optics
 import Domain.Error
-import Domain.Type.Internal
+import Domain.TaskId
+import Domain.TodoRegistry
 
 class Serializable a where
     serialize :: a -> ByteString

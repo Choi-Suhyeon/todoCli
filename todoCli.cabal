@@ -34,11 +34,10 @@ library
       Common.Util
       Domain
       Domain.Error
-      Domain.Internal
       Domain.Log
       Domain.Serialization
-      Domain.Type
-      Domain.Type.Internal
+      Domain.TaskId
+      Domain.TodoRegistry
       Effect
       Effect.Error
       Effect.Format

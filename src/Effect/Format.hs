@@ -3,7 +3,7 @@ module Effect.Format
     , RenderConfig (..)
     , Column
     , initTaskSnapshotRenderConfig
-    , sortTaskSnapshots
+    , sortTaskDetails
     , renderTable
     , renderTableWithout
     ) where
@@ -19,7 +19,7 @@ import Data.HashSet qualified as S
 import Data.Text qualified as T
 
 import Common
-import Domain (SnapshotStatus (..), TaskSnapshot (..))
+import Domain (TaskStatusDetail(..), TaskDetail(..))
 
 data Column a b = Column
     { colName :: a
@@ -43,28 +43,28 @@ data ColNameTaskSnapshot
     deriving (Eq, Show)
 
 initTaskSnapshotRenderConfig
-    :: TimeZone -> Int -> Int -> RenderConfig ColNameTaskSnapshot TaskSnapshot
+    :: TimeZone -> Int -> Int -> RenderConfig ColNameTaskSnapshot TaskDetail
 initTaskSnapshotRenderConfig tz vs hs =
     RenderConfig
         { vSpace = vs
         , hSpace = hs
         , cols =
-            [ Column CNStatus $ getStatusSymbol @String . (^. #statusS)
-            , Column CNName $ T.unpack . (^. #nameS)
-            , Column CNDeadline $ iso8601Show . utcToLocalTime tz . (^. #deadlineS)
-            , Column CNTags $ T.unpack . T.intercalate " " . sort . S.toList . (^. #tagsS)
-            , Column CNDesc $ T.unpack . (^. #descS)
+            [ Column CNStatus $ getStatusSymbol @String . (\t -> t.status)
+            , Column CNName $ T.unpack . (\t -> t.name)
+            , Column CNDeadline $ iso8601Show . utcToLocalTime tz . (\t -> t.deadline)
+            , Column CNTags $ T.unpack . T.intercalate ", " . sort . S.toList . (\t -> t.tags)
+            , Column CNDesc $ T.unpack . (\t -> t.desc)
             ]
         }
 
-sortTaskSnapshots :: [TaskSnapshot] -> [TaskSnapshot]
-sortTaskSnapshots =
+sortTaskDetails :: [TaskDetail] -> [TaskDetail]
+sortTaskDetails =
     sortBy
-        $ comparing (^. #statusS)
-            <> comparing (Down . (^. #deadlineS))
-            <> comparing (length . (^. #tagsS))
-            <> comparing (T.length . (^. #nameS))
-            <> comparing (T.length . (^. #descS))
+        $ comparing (\t -> t.status)
+            <> comparing (Down . (\t -> t.deadline))
+            <> comparing (length . (\t -> t.tags))
+            <> comparing (T.length . (\t -> t.name))
+            <> comparing (T.length . (\t -> t.desc))
 
 renderTable :: (Eq a) => RenderConfig a b -> [b] -> String
 renderTable = renderTableWithout Nothing
@@ -80,8 +80,8 @@ renderTableWithout xs RenderConfig{..} ts =
     renderTable' :: Int -> Int -> [b -> Box] -> [b] -> String
     renderTable' vs hs = (render . hsep hs top . (vsep vs left <$>)) .: weave
 
-getStatusSymbol :: (IsString a) => SnapshotStatus -> a
-getStatusSymbol SOverdue = "[X]"
-getStatusSymbol SDue = "[!]"
-getStatusSymbol SUndone = "[U]"
-getStatusSymbol SDone = "[O]"
+getStatusSymbol :: (IsString a) => TaskStatusDetail -> a
+getStatusSymbol DOverdue = "[X]"
+getStatusSymbol DDue = "[!]"
+getStatusSymbol DUndone = "[U]"
+getStatusSymbol DDone = "[O]"

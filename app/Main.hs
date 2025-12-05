@@ -137,8 +137,8 @@ runListCommand ListCommand{tags, status} = do
 
     snapshots <-
         S.intersection tasks' tasks''
-            & getTaskSnapshots
-            & fmap sortTaskSnapshots
+            & getTaskDetails
+            & fmap sortTaskDetails
 
     liftIO . putStrLn $ renderTable (initTaskSnapshotRenderConfig tz 0 1) snapshots
     pure ()
@@ -149,17 +149,17 @@ runEditCommand EditCommand{tgtName, name, deadline, desc, tags} = do
     target <- getUniqueTarget tgtName
 
     editTask
-        EntryUpdate{name, desc, tags, deadline = localTimeToUTC tz <$> deadline}
+        EntryPatch{name, desc, tags, deadline = localTimeToUTC tz <$> deadline, status = Nothing}
         target
 
 runMarkCommand :: MarkCommand -> App ()
-runMarkCommand (MrkDone tgtName) = getUniqueTarget tgtName >>= markTask MDone
-runMarkCommand (MrkUndone tgtName) = getUniqueTarget tgtName >>= markTask MUndone
+runMarkCommand (MrkDone tgtName) = getUniqueTarget tgtName >>= markTask PDone
+runMarkCommand (MrkUndone tgtName) = getUniqueTarget tgtName >>= markTask PUndone
 
 runDeleteCommand :: DeleteCommand -> App ()
 runDeleteCommand DelAll = getAllTasks >>= deleteTasks
 runDeleteCommand DelBy{byName, byTags, byStatus} = do
-    tasks' <- traverse getTasksByNameContaining byName
+    tasks' <- traverse getTasksByNameRegex byName
     tasks'' <- traverse getTasksWithAllTags byTags
     tasks''' <- (`traverse` byStatus) \case
         DelDone -> getDoneTasks
@@ -180,7 +180,7 @@ runDeleteCommand DelBy{byName, byTags, byStatus} = do
     deleteTasks tasks
 
 getUniqueTarget :: (MonadError AppError m, MonadRegistry m) => Text -> m TaskId
-getUniqueTarget = getTasksByNameContaining >=> getFromSingleton
+getUniqueTarget = getTasksByNameRegex >=> getFromSingleton
 
 getFromSingleton :: (Foldable f, MonadError AppError m) => f a -> m a
 getFromSingleton = (. toList) \case
