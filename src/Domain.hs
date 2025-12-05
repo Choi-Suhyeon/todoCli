@@ -4,12 +4,12 @@ module Domain
     , MonadRegistry
     , TodoRegistry
     , TaskId
-    , EntryCreate(..)
-    , EntryPatch(..)
-    , PatchStatus(..)
-    , TaskBasic(..)
-    , TaskDetail(..)
-    , TaskStatusDetail(..)
+    , EntryCreate (..)
+    , EntryPatch (..)
+    , PatchStatus (..)
+    , TaskBasic (..)
+    , TaskDetail (..)
+    , TaskStatusDetail (..)
     , initTodoRegistry
     , getAllTasks
     , getTasksWithAllTags
@@ -25,14 +25,13 @@ module Domain
     , getTaskDetails
     ) where
 
+import Control.Monad (when)
 import Control.Monad.Reader (ask)
 import Control.Monad.State.Strict (MonadState (..), modify')
-import Control.Monad (when)
 import Data.Either (fromRight)
 import Data.Foldable (for_)
-import Data.Maybe (mapMaybe)
 import Data.HashSet (HashSet)
-import Data.Maybe (fromJust, isJust)
+import Data.Maybe (fromJust, isJust, mapMaybe)
 import Data.Text (Text)
 import Witch
 
@@ -43,13 +42,24 @@ import Common
 import Domain.Error
 import Domain.Log
 import Domain.TaskId
-import Domain.TodoRegistry (TodoRegistry, EntryCreate, PatchStatus, TaskDetail, TaskBasic(..), EntryPatch(..), TaskStatusDetail(..), initTodoRegistry)
+import Domain.TodoRegistry
+    ( EntryCreate
+    , EntryPatch (..)
+    , PatchStatus
+    , TaskBasic (..)
+    , TaskDetail
+    , TaskStatusDetail (..)
+    , TodoRegistry
+    , initTodoRegistry
+    )
 
 import Domain.TodoRegistry qualified as TR
 
 type MonadRegistry m = MonadState TodoRegistry m
 
-addTask :: (MonadDomainError e m, MonadEnv m, MonadLog m, MonadRegistry m) => EntryCreate -> m ()
+addTask
+    :: (MonadDomainError e m, MonadEnv m, MonadLog m, MonadRegistry m)
+    => EntryCreate -> m ()
 addTask e = do
     Env{tz, now} <- ask
     newTask <- liftEitherInto $ TR.mkTask tz now e
@@ -79,7 +89,8 @@ editTask e tid = do
     logMsg $ "task updated:\n  (old)\n" <> msgForOld <> "\n  (new)\n" <> msgForNew
     put $ TR.updateTask tid newTask reg
 
-markTask :: (MonadEnv m, MonadLog m, MonadRegistry m) => PatchStatus -> TaskId -> m ()
+markTask
+    :: (MonadEnv m, MonadLog m, MonadRegistry m) => PatchStatus -> TaskId -> m ()
 markTask s tid = do
     Env{tz, now} <- ask
     reg <- get
@@ -88,26 +99,40 @@ markTask s tid = do
         let
             task = fromJust $ TR.getTaskById tid reg
             TaskBasic{name} = TR.toTaskBasic task
-            entry = EntryPatch
-                { name = Nothing
-                , desc = Nothing
-                , tags = Nothing
-                , deadline = Nothing
-                , status = Just s
-                }
+            entry =
+                EntryPatch
+                    { name = Nothing
+                    , desc = Nothing
+                    , tags = Nothing
+                    , deadline = Nothing
+                    , status = Just s
+                    }
 
-        logMsg $ "task marked " <> (show s & into & T.toLower) <> ": '" <>  name <> "'"
-        put $ TR.updateTask tid (fromRight undefined $ TR.modifyTask tz now entry task) reg
+        logMsg $ "task marked " <> (show s & into & T.toLower) <> ": '" <> name <> "'"
+        put
+            $ TR.updateTask tid (fromRight undefined $ TR.modifyTask tz now entry task) reg
 
-deleteTasks :: (MonadEnv m, MonadLog m, MonadRegistry m) => HashSet TaskId -> m ()
+deleteTasks
+    :: (MonadEnv m, MonadLog m, MonadRegistry m) => HashSet TaskId -> m ()
 deleteTasks taskIds = do
     Env{..} <- ask
     reg <- get
 
-    for_ taskIds $ liftA2 when isJust (logMsg . ("task deleted: " <>) . renderTaskSummary . (TR.toTaskDetail now) . fromJust) . (`TR.getTaskById` reg)
+    for_ taskIds
+        $ liftA2
+            when
+            isJust
+            ( logMsg
+                . ("task deleted: " <>)
+                . renderTaskSummary
+                . (TR.toTaskDetail now)
+                . fromJust
+            )
+            . (`TR.getTaskById` reg)
     put $ S.foldl' (flip TR.deleteTask) reg taskIds
 
-getTaskDetails :: (MonadEnv m, MonadRegistry m) => HashSet TaskId -> m [TaskDetail]
+getTaskDetails
+    :: (MonadEnv m, MonadRegistry m) => HashSet TaskId -> m [TaskDetail]
 getTaskDetails tids = do
     Env{..} <- ask
     reg <- get

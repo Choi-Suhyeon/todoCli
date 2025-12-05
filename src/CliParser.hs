@@ -5,7 +5,11 @@ import Data.Bool (bool)
 import Data.HashSet (HashSet)
 import Data.Text (Text)
 import Data.Time.Calendar (Day (..))
-import Data.Time.Format.ISO8601 (calendarFormat, iso8601ParseM, parseFormatExtension)
+import Data.Time.Format.ISO8601
+    ( calendarFormat
+    , iso8601ParseM
+    , parseFormatExtension
+    )
 import Data.Time.LocalTime (LocalTime (..), TimeOfDay (..))
 import Data.Version (showVersion)
 import Options.Applicative
@@ -127,12 +131,20 @@ pCommand = hsubparser $ cAdd <> cList <> cEdit <> cMark <> cDelete
             $ info (Add <$> pAddCommand)
             $ progDesc "Add a new task with name, description, deadline, and optional tags"
 
-    cList = command "list" $ info (List <$> pListCommand) $ progDesc "List tasks filtered by status or tags"
+    cList =
+        command "list"
+            $ info (List <$> pListCommand)
+            $ progDesc "List tasks filtered by status or tags"
 
     cEdit =
-        command "edit" $ info (Edit <$> pEditCommand) $ progDesc "Edit the properties of an existing task"
+        command "edit"
+            $ info (Edit <$> pEditCommand)
+            $ progDesc "Edit the properties of an existing task"
 
-    cMark = command "mark" $ info (Mark <$> pMarkCommand) $ progDesc "Mark a task as done or undone"
+    cMark =
+        command "mark"
+            $ info (Mark <$> pMarkCommand)
+            $ progDesc "Mark a task as done or undone"
 
     cDelete =
         command "delete"
@@ -307,7 +319,12 @@ datetimeReader =
 textSetReader :: ReadM (HashSet Text)
 textSetReader =
     maybeReader
-        $ mfilter isValidSetLen . fmap uniqueWords . mfilter isValidFormat . pure . T.toUpper . T.pack
+        $ mfilter isValidSetLen
+            . fmap uniqueWords
+            . mfilter isValidFormat
+            . pure
+            . T.toUpper
+            . T.pack
   where
     isValidFormat :: Text -> Bool
     isValidFormat = (=~ ("^ *[A-Z]{1,10}( +[A-Z]{1,10})* *$" :: Text))

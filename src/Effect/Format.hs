@@ -19,7 +19,7 @@ import Data.HashSet qualified as S
 import Data.Text qualified as T
 
 import Common
-import Domain (TaskStatusDetail(..), TaskDetail(..))
+import Domain (TaskDetail (..), TaskStatusDetail (..))
 
 data Column a b = Column
     { colName :: a

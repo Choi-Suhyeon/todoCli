@@ -1,5 +1,5 @@
 module Domain.TaskId
-    ( TaskId(..)
+    ( TaskId (..)
     , Ids
     , initIds
     , allocId
