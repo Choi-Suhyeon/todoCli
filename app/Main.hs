@@ -155,15 +155,20 @@ runEditCommand EditCommand{tgtName, name, deadline, desc, tags} = do
     Env{tz} <- ask
     target <- getUniqueTarget tgtName
 
-    editTask
-        EntryPatch
-            { name
-            , desc
-            , tags
-            , deadline = localTimeToUTC tz <$> deadline
-            , status = Nothing
-            }
-        target
+    let
+        entryPatch =
+            EntryPatch
+                { name
+                , desc
+                , status = Nothing
+                , tags = case tags of
+                    Nothing -> Nothing
+                    Just Clear -> Just mempty
+                    Just (Substitute s) -> Just s
+                , deadline = localTimeToUTC tz <$> deadline
+                }
+
+    editTask entryPatch target
 
 runMarkCommand :: MarkCommand -> App ()
 runMarkCommand (MrkDone tgtName) = getUniqueTarget tgtName >>= markTask PDone

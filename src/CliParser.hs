@@ -234,7 +234,20 @@ pEditCommand = EditCommand <$> pTgtName <*> pName <*> pDesc <*> pTags <*> pDeadl
                 <> metavar "NEW_DESCRIPTION"
                 <> help "New description"
 
-    pTags :: Parser (Maybe (HashSet Text))
+    pTags :: Parser (Maybe EditTags)
+    pTags = optional $ clear <|> substitute
+      where
+        clear = flag' Clear
+            $ short 'T'
+                <> long "clear-tag"
+                <> help "Clear all tags of the target task"
+
+        substitute = option (Substitute <$> textSetReader)
+            $ short 't'
+                <> long "tags"
+                <> metavar "NEW_TAGS"
+                <> help "New tags (space-separated)"
+    {--
     pTags =
         optional
             $ option textSetReader
@@ -242,6 +255,7 @@ pEditCommand = EditCommand <$> pTgtName <*> pName <*> pDesc <*> pTags <*> pDeadl
                 <> long "tags"
                 <> metavar "NEW_TAGS"
                 <> help "New tags (space-separated)"
+    --}
 
     pDeadline :: Parser (Maybe LocalTime)
     pDeadline =

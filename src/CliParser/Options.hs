@@ -4,6 +4,7 @@ module CliParser.Options
     , AddCommand (..)
     , ListCommand (..)
     , EditCommand (..)
+    , EditTags (..)
     , MarkCommand (..)
     , DeleteCommand (..)
     , ListStatus (..)
@@ -51,9 +52,12 @@ data EditCommand = EditCommand
     { tgtName :: Text
     , name :: Maybe Text
     , desc :: Maybe Text
-    , tags :: Maybe (HashSet Text)
+    , tags :: Maybe EditTags
     , deadline :: Maybe LocalTime
     }
+    deriving (Generic, Show)
+
+data EditTags = Clear | Substitute (HashSet Text)
     deriving (Generic, Show)
 
 data MarkCommand
