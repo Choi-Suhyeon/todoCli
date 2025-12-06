@@ -237,16 +237,18 @@ pEditCommand = EditCommand <$> pTgtName <*> pName <*> pDesc <*> pTags <*> pDeadl
     pTags :: Parser (Maybe EditTags)
     pTags = optional $ clear <|> substitute
       where
-        clear = flag' Clear
-            $ short 'T'
-                <> long "clear-tag"
-                <> help "Clear all tags of the target task"
+        clear =
+            flag' Clear
+                $ short 'T'
+                    <> long "clear-tag"
+                    <> help "Clear all tags of the target task"
 
-        substitute = option (Substitute <$> textSetReader)
-            $ short 't'
-                <> long "tags"
-                <> metavar "NEW_TAGS"
-                <> help "New tags (space-separated)"
+        substitute =
+            option (Substitute <$> textSetReader)
+                $ short 't'
+                    <> long "tags"
+                    <> metavar "NEW_TAGS"
+                    <> help "New tags (space-separated)"
     {--
     pTags =
         optional

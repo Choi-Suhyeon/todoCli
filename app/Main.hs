@@ -28,6 +28,7 @@ import Common
 import Domain
 import Domain.Serialization
 import Effect
+import View
 
 newtype App a = App
     { unApp :: ReaderT Env (StateT TodoRegistry (ExceptT AppError (WriterT Log IO))) a
@@ -147,7 +148,7 @@ runListCommand ListCommand{tags, status} = do
             & getTaskDetails
             & fmap sortTaskDetails
 
-    liftIO . putStrLn $ renderTable (initTaskSnapshotRenderConfig tz 0 1) snapshots
+    liftIO . putStrLn $ renderTable (initTaskDetailRenderConfig tz) snapshots
     pure ()
 
 runEditCommand :: EditCommand -> App ()
