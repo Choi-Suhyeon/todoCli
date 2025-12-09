@@ -68,9 +68,7 @@ data EditTags = Clear | Substitute (HashSet Text)
 data EditMemo = Remove | Memo Text
     deriving (Generic, Show)
 
-data MarkCommand
-    = MrkDone Text
-    | MrkUndone Text
+data MarkCommand = MrkDone Text | MrkUndone Text
     deriving (Generic, Show)
 
 data DeleteCommand
@@ -82,11 +80,7 @@ data DeleteCommand
         }
     deriving (Generic, Show)
 
-data ListStatus
-    = LstDone
-    | LstUndone
-    | LstDue
-    | LstOverdue
+data ListStatus = LstDone | LstUndone | LstDue | LstOverdue
     deriving (Generic, Show)
 
 instance Read ListStatus where

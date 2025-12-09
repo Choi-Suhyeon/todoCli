@@ -6,6 +6,7 @@ module Domain.TaskId
     , releaseId
     ) where
 
+import Data.Serialize (Serialize)
 import Data.Bifunctor (bimap)
 import Data.Generics.Labels ()
 import Data.Hashable (Hashable)
@@ -61,3 +62,6 @@ releaseId tid ids
     isValidId = liftA2 (&&) (>= minTaskId) (< ids.next) tid
     isMaxId = (tid & #unTaskId %~ succ) == ids.next
     isDoubleFreed = tid.unTaskId `IS.member` ids.released
+
+deriving anyclass instance Serialize Ids
+deriving newtype instance Serialize TaskId

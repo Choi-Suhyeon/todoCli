@@ -28,15 +28,15 @@ renderTaskDetail :: TimeZone -> TaskDetail -> Text
 renderTaskDetail tz TaskDetail{name, status, deadline, tags, memo} =
     T.unlines
         [ "  name:     " <> name
-        , "  status:   " <> into status
+        , "  status:   " <> into (show status)
         , "  deadline: " <> renderDeadline tz deadline
         , "  tags:     " <> renderTags False tags
-        , "  note:     " <> liftA2 (bool "N/A") id T.null memo
+        , "  memo:     " <> if T.null memo then "N/A" else memo
         ]
 
 renderTaskSummary :: TaskDetail -> Text
 renderTaskSummary TaskDetail{name, status, tags} =
-    T.concat [into status, " task '", name, "' ", renderTags True tags]
+    T.concat [into $ show status, " task '", name, "' ", renderTags True tags]
 
 renderDeadline :: TimeZone -> TaskDetailDeadline -> Text
 renderDeadline _ DBoundless = "N/A"

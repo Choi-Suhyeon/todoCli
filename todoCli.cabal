@@ -1,6 +1,6 @@
 cabal-version: 2.2
 
--- This file has been generated from package.yaml by hpack version 0.37.0.
+-- This file has been generated from package.yaml by hpack version 0.38.0.
 --
 -- see: https://github.com/sol/hpack
 
@@ -36,6 +36,7 @@ library
       Domain.Error
       Domain.Log
       Domain.Serialization
+      Domain.Serialization.CerealOrphans
       Domain.TaskId
       Domain.TodoRegistry
       Effect
@@ -76,6 +77,8 @@ library
       DerivingStrategies
       MultiParamTypeClasses
       FunctionalDependencies
+      FlexibleInstances
+      DerivingVia
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wredundant-constraints
   build-depends:
       base
@@ -133,6 +136,8 @@ executable todoCli-exe
       DerivingStrategies
       MultiParamTypeClasses
       FunctionalDependencies
+      FlexibleInstances
+      DerivingVia
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base

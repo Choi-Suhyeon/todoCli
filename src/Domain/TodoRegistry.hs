@@ -2,16 +2,19 @@ module Domain.TodoRegistry
     ( TodoRegistry
     , TaskId
     , Task
+    , TaskName
+    , TaskMemo
     , TaskStatus
-    , Deadline
+    , TaskTags
+    , TaskDeadline
     , TaskDetail (..)
     , TaskBasic (..)
-    , TaskStatusDetail (..)
+    , TaskDetailStatus (..)
     , TaskDetailDeadline (..)
-    , EntryCreate (..)
+    , EntryCreation (..)
     , EntryPatch (..)
     , EntryDeadline (..)
-    , PatchStatus (..)
+    , EntryStatus (..)
     -- TodoRegistry Construction
     , initTodoRegistry
     -- TodoRegistry Query
@@ -26,7 +29,7 @@ module Domain.TodoRegistry
     , getTasksWithAllTags
     -- TodoRegistry Update/Delete
     , insertTask
-    , updateTask
+    , replaceTask
     , deleteTask
     -- Todo Construction
     , mkTask
@@ -35,28 +38,32 @@ module Domain.TodoRegistry
     -- Todo Conversion
     , toTaskDetail
     , toTaskBasic
-    ) where
+    )
+where
 
 import Data.Fixed (Pico)
-import Data.Function ((&))
+import Data.Function (on, (&))
 import Data.Generics.Labels ()
 import Data.HashSet (HashSet)
 import Data.Hashable (Hashable (..))
 import Data.IntMap (IntMap)
 import Data.Map (Map)
 import Data.Maybe (fromMaybe)
+import Data.String (IsString (..))
 import Data.Text (Text)
-import Data.Time.Clock (NominalDiffTime, UTCTime (..), addUTCTime)
 import Data.Time.Calendar (toModifiedJulianDay)
+import Data.Time.Clock (NominalDiffTime, UTCTime (..), addUTCTime)
 import Data.Time.LocalTime (TimeZone, utcToLocalTime)
 import GHC.Generics (Generic)
 import Text.Regex.TDFA (Regex, makeRegex, matchTest)
+import Data.Serialize (Serialize (..))
 import Witch
 
 import Data.HashSet qualified as S
 import Data.IntMap qualified as IM
 import Data.Map qualified as M
 
+import Domain.Serialization.CerealOrphans ()
 import Domain.Error
 import Domain.TaskId
 
@@ -69,46 +76,65 @@ data TodoRegistry = TodoRegistry
     deriving (Generic, Show)
 
 data Task = Task
-    { name :: !Text
+    { name :: !TaskName
     , memo :: !TaskMemo
-    , tags :: !(HashSet Text)
+    , tags :: !TaskTags
     , status :: !TaskStatus
-    , deadline :: !Deadline
+    , deadline :: !TaskDeadline
     }
     deriving (Generic, Show)
 
-data TaskStatus
-    = Done
-    | Undone
+newtype TaskName = TaskName {unTaskName :: Text}
+    deriving stock (Eq, Generic, Ord, Show)
+    deriving (Hashable, IsString) via Text
+
+instance From Text TaskName
+instance From TaskName Text
+
+newtype TaskMemo = TaskMemo {unTaskMemo :: Text}
+    deriving stock (Eq, Generic, Ord, Show)
+    deriving (Hashable, IsString) via Text
+
+instance From Text TaskMemo
+instance From TaskMemo Text
+
+data TaskStatus = Done | Undone
     deriving (Eq, Generic, Ord, Show)
 
 instance Hashable TaskStatus where
     hashWithSalt s Done = s `hashWithSalt` (0 :: Int)
     hashWithSalt s Undone = s `hashWithSalt` (1 :: Int)
 
-data Deadline
+newtype TaskTags = TaskTags {unTaskTags :: HashSet Text}
+    deriving stock (Eq, Generic, Ord, Show)
+    deriving (Hashable, Monoid, Semigroup) via (HashSet Text)
+
+instance From (HashSet Text) TaskTags
+instance From TaskTags (HashSet Text)
+
+data TaskDeadline
     = Boundless
     | Bound UTCTime
     deriving (Eq, Generic, Ord, Show)
 
-instance Hashable Deadline where
+instance Hashable TaskDeadline where
     hashWithSalt salt Boundless =
         salt `hashWithSalt` (0 :: Int)
     hashWithSalt salt (Bound (UTCTime day diffTime)) =
-        salt `hashWithSalt` (1 :: Int)
-                `hashWithSalt` toModifiedJulianDay day
-                `hashWithSalt` (truncate (diffTime * 1000000000) :: Integer)
+        salt
+            `hashWithSalt` (1 :: Int)
+            `hashWithSalt` toModifiedJulianDay day
+            `hashWithSalt` (truncate (diffTime * 1000000000) :: Integer)
 
-data TaskMemo
-    = EmptyMemo
-    | Memo Text
-    deriving (Eq, Generic, Ord, Show)
+deriving anyclass instance Serialize TaskStatus
+deriving anyclass instance Serialize TaskDeadline
+deriving anyclass instance Serialize TaskTags
+deriving anyclass instance Serialize TaskName
+deriving anyclass instance Serialize TaskMemo
+deriving anyclass instance Serialize Task
+deriving anyclass instance Serialize TodoRegistry
 
-instance Hashable TaskMemo where
-    hashWithSalt s EmptyMemo = s `hashWithSalt` (0 :: Int)
-    hashWithSalt s (Memo m) = s `hashWithSalt` (1 :: Int) `hashWithSalt` m
-
-data EntryCreate = EntryCreate
+data EntryCreation = EntryCreation
     { name :: !Text
     , memo :: !Text
     , tags :: !(HashSet Text)
@@ -121,68 +147,71 @@ data EntryPatch = EntryPatch
     , memo :: !(Maybe Text)
     , tags :: !(Maybe (HashSet Text))
     , deadline :: !(Maybe EntryDeadline)
-    , status :: !(Maybe PatchStatus)
+    , status :: !(Maybe EntryStatus)
     }
     deriving (Show)
 
 data EntryDeadline
     = EBoundless
     | EBound UTCTime
-    deriving (Show, Generic)
+    deriving (Generic, Show)
 
-instance From EntryDeadline Deadline where
+instance From EntryDeadline TaskDeadline where
     from EBoundless = Boundless
     from (EBound t) = Bound t
 
-data PatchStatus
-    = PDone
-    | PUndone
+data EntryStatus
+    = EDone
+    | EUndone
 
-instance Show PatchStatus where
-    show PDone = "done"
-    show PUndone = "undone"
+instance Show EntryStatus where
+    show EDone = "done"
+    show EUndone = "undone"
 
-instance From PatchStatus TaskStatus where
-    from PDone = Done
-    from PUndone = Undone
+instance From EntryStatus TaskStatus where
+    from EDone = Done
+    from EUndone = Undone
 
-instance From TaskStatus PatchStatus where
-    from Done = PDone
-    from Undone = PUndone
+instance From TaskStatus EntryStatus where
+    from Done = EDone
+    from Undone = EUndone
 
 data TaskDetail = TaskDetail
     { name :: !Text
     , memo :: !Text
     , tags :: !(HashSet Text)
-    , status :: !TaskStatusDetail
+    , status :: !TaskDetailStatus
     , deadline :: !TaskDetailDeadline
     }
     deriving (Show)
 
-data TaskStatusDetail
+data TaskDetailStatus
     = DDone
     | DUndone
     | DDue
     | DOverdue
     deriving (Eq, Ord)
 
-instance Show TaskStatusDetail where
+instance Show TaskDetailStatus where
     show DDone = "done"
     show DUndone = "undone"
     show DDue = "due"
     show DOverdue = "overdue"
 
-instance From TaskStatusDetail Text where
-    from = into . show
-
 data TaskDetailDeadline
     = DBoundless
     | DBound UTCTime
-    deriving (Show)
+    deriving (Eq, Show)
 
-instance From Deadline TaskDetailDeadline where
+instance From TaskDeadline TaskDetailDeadline where
     from Boundless = DBoundless
-    from (Bound t) = DBound t
+    from (Bound d) = DBound d
+
+instance Ord TaskDetailDeadline where
+    compare DBoundless DBoundless = EQ
+    compare DBoundless (DBound _) = GT
+    compare (DBound _) DBoundless = LT
+    compare (DBound d1) (DBound d2) = d1 `compare` d2
 
 data TaskBasic = TaskBasic
     { name :: Text
@@ -202,20 +231,20 @@ insertTask task@Task{..} TodoRegistry{..} =
     TodoRegistry
         { ids = ids'
         , idToTask = IM.insert (into tid) task idToTask
-        , tagToId = insertIntoSetsAtKeysWith (<>) tid tags tagToId
+        , tagToId = insertIntoSetsAtKeysWith (<>) tid (into @(HashSet Text) tags) tagToId
         , statusToId = insertIntoSetsAtKeysWith (<>) tid (Just status) statusToId
         }
   where
     (ids', tid) = allocId ids
 
-updateTask :: TaskId -> Task -> TodoRegistry -> TodoRegistry
-updateTask tid newTask reg@TodoRegistry{..} = case getTaskById tid reg of
+replaceTask :: TaskId -> Task -> TodoRegistry -> TodoRegistry
+replaceTask tid newTask reg@TodoRegistry{..} = case getTaskById tid reg of
     Nothing -> reg
     Just oldTask ->
         TodoRegistry
             { ids = ids
             , idToTask = IM.insert (into tid) newTask idToTask
-            , tagToId = getNewTagToId oldTask.tags newTask.tags
+            , tagToId = (getNewTagToId `on` into @(HashSet Text)) oldTask.tags newTask.tags
             , statusToId = getNewStatusToId oldTask.status newTask.status
             }
   where
@@ -239,7 +268,7 @@ deleteTask tid reg@TodoRegistry{..}
         TodoRegistry
             { ids = releaseId tid ids
             , idToTask = IM.delete (into tid) idToTask
-            , tagToId = deleteFromSetsAtKeys tid tags tagToId
+            , tagToId = deleteFromSetsAtKeys tid (into @(HashSet Text) tags) tagToId
             , statusToId = deleteFromSetsAtKeys tid (Just status) statusToId
             }
     | otherwise = reg
@@ -247,30 +276,46 @@ deleteTask tid reg@TodoRegistry{..}
 getTaskById :: TaskId -> TodoRegistry -> Maybe Task
 getTaskById tid TodoRegistry{idToTask} = IM.lookup (into tid) idToTask
 
-mkTask :: TimeZone -> UTCTime -> EntryCreate -> Either DomainError Task
-mkTask tz now EntryCreate{..}
+mkTask :: TimeZone -> UTCTime -> EntryCreation -> Either DomainError Task
+mkTask tz now EntryCreation{..}
     | EBound d <- deadline, Left e <- validateDeadline tz now d = Left e
-    | otherwise = Right Task{name, memo, tags, deadline = into deadline, status = Undone}
+    | otherwise =
+        Right
+            Task
+                { name = into name
+                , memo = into memo
+                , tags = into tags
+                , deadline = into deadline
+                , status = Undone
+                }
 
 modifyTask
     :: TimeZone -> UTCTime -> EntryPatch -> Task -> Either DomainError Task
 modifyTask tz now entry task
-    | Just (EBound d) <- entry.deadline, Left e <- validateDeadline tz now d = Left e
+    | Just (EBound d) <- entry.deadline
+    , Left e <- validateDeadline tz now d =
+        Left e
     | otherwise =
         Right
             Task
-                { name = fromMaybe task.name entry.name
-                , memo = fromMaybe task.memo entry.memo
-                , tags = fromMaybe task.tags entry.tags
+                { name = fromMaybe task.name $ into <$> entry.name
+                , memo = fromMaybe task.memo $ into <$> entry.memo
+                , tags = fromMaybe task.tags $ into <$> entry.tags
                 , deadline = fromMaybe task.deadline (into <$> entry.deadline)
                 , status = maybe task.status into entry.status
                 }
 
 toTaskDetail :: UTCTime -> Task -> TaskDetail
 toTaskDetail now Task{..} =
-    TaskDetail{name, memo, tags, deadline = into deadline, status = enrichStatus status}
+    TaskDetail
+        { name = into name
+        , memo = into memo
+        , tags = into tags
+        , deadline = into deadline
+        , status = enrichStatus status
+        }
   where
-    enrichStatus :: TaskStatus -> TaskStatusDetail
+    enrichStatus :: TaskStatus -> TaskDetailStatus
     enrichStatus Done = DDone
     enrichStatus Undone = case deadline of
         Boundless -> DUndone
@@ -280,7 +325,12 @@ toTaskDetail now Task{..} =
             | otherwise -> DUndone
 
 toTaskBasic :: Task -> TaskBasic
-toTaskBasic Task{..} = TaskBasic{name, memo, tags}
+toTaskBasic Task{..} =
+    TaskBasic
+        { name = into name
+        , memo = into memo
+        , tags = into tags
+        }
 
 getAllTasks :: TodoRegistry -> HashSet TaskId
 getAllTasks = getTasksMatching (const True)
@@ -298,7 +348,7 @@ getDueTasks :: UTCTime -> TodoRegistry -> HashSet TaskId
 getDueTasks now = getTasksUndoneAnd $ isDue now
 
 getTasksByNameRegex :: Text -> TodoRegistry -> HashSet TaskId
-getTasksByNameRegex pattern = getTasksMatching (\Task{name} -> matchTest compiled name)
+getTasksByNameRegex pattern = getTasksMatching (\Task{name} -> matchTest compiled (into @Text name))
   where
     compiled = makeRegex pattern :: Regex
 
@@ -344,8 +394,8 @@ getTasksUndoneAnd p reg@TodoRegistry{idToTask} =
         & S.filter (predicate . (idToTask IM.!?) . into)
   where
     predicate :: Maybe Task -> Bool
-    predicate (Just Task { deadline = Bound x }) = p x
-    predicate (Just Task { deadline = Boundless }) = False
+    predicate (Just Task{deadline = Bound x}) = p x
+    predicate (Just Task{deadline = Boundless}) = False
     predicate Nothing = False
 
 isDue :: UTCTime -> UTCTime -> Bool

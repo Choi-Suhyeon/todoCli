@@ -129,7 +129,7 @@ runCommand (Delete x) = runDeleteCommand x
 
 runAddCommand :: AddCommand -> App ()
 runAddCommand AddCommand{name, deadline, memo, tags} = do
-    optionDeadlineToEntryDeadline deadline >>= \utcDeadline -> addTask EntryCreate{name, memo, tags, deadline = utcDeadline}
+    optionDeadlineToEntryDeadline deadline >>= \utcDeadline -> addTask EntryCreation{name, memo, tags, deadline = utcDeadline}
 
 runListCommand :: ListCommand -> App ()
 runListCommand ListCommand{tags, status} = do
@@ -160,7 +160,9 @@ runEditCommand EditCommand{tgtName, name, deadline, memo, tags} = do
         entryPatch =
             EntryPatch
                 { name
-                , memo
+                , memo = (<$> memo) \case
+                    Remove -> ""
+                    Memo m -> m
                 , status = Nothing
                 , deadline = utcDeadline
                 , tags = case tags of
@@ -172,8 +174,8 @@ runEditCommand EditCommand{tgtName, name, deadline, memo, tags} = do
     editTask entryPatch target
 
 runMarkCommand :: MarkCommand -> App ()
-runMarkCommand (MrkDone tgtName) = getUniqueTarget tgtName >>= markTask PDone
-runMarkCommand (MrkUndone tgtName) = getUniqueTarget tgtName >>= markTask PUndone
+runMarkCommand (MrkDone tgtName) = getUniqueTarget tgtName >>= markTask EDone
+runMarkCommand (MrkUndone tgtName) = getUniqueTarget tgtName >>= markTask EUndone
 
 runDeleteCommand :: DeleteCommand -> App ()
 runDeleteCommand DelAll = getAllTasks >>= deleteTasks

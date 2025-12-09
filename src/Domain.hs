@@ -4,13 +4,14 @@ module Domain
     , MonadRegistry
     , TodoRegistry
     , TaskId
-    , EntryCreate (..)
+    , EntryCreation (..)
     , EntryPatch (..)
     , EntryDeadline (..)
-    , PatchStatus (..)
+    , EntryStatus (..)
     , TaskBasic (..)
     , TaskDetail (..)
-    , TaskStatusDetail (..)
+    , TaskDetailDeadline (..)
+    , TaskDetailStatus (..)
     , initTodoRegistry
     , getAllTasks
     , getTasksWithAllTags
@@ -44,13 +45,14 @@ import Domain.Error
 import Domain.Log
 import Domain.TaskId
 import Domain.TodoRegistry
-    ( EntryCreate
+    ( EntryCreation
     , EntryPatch (..)
     , EntryDeadline
-    , PatchStatus
+    , EntryStatus
     , TaskBasic (..)
     , TaskDetail
-    , TaskStatusDetail (..)
+    , TaskDetailDeadline (..)
+    , TaskDetailStatus (..)
     , TodoRegistry
     , initTodoRegistry
     )
@@ -61,7 +63,7 @@ type MonadRegistry m = MonadState TodoRegistry m
 
 addTask
     :: (MonadDomainError e m, MonadEnv m, MonadLog m, MonadRegistry m)
-    => EntryCreate -> m ()
+    => EntryCreation -> m ()
 addTask e = do
     Env{tz, now} <- ask
     newTask <- liftEitherInto $ TR.mkTask tz now e
@@ -89,10 +91,10 @@ editTask e tid = do
         msgForNew = renderTaskDetail tz $ TR.toTaskDetail now newTask
 
     logMsg $ "task updated:\n  (old)\n" <> msgForOld <> "\n  (new)\n" <> msgForNew
-    put $ TR.updateTask tid newTask reg
+    put $ TR.replaceTask tid newTask reg
 
 markTask
-    :: (MonadEnv m, MonadLog m, MonadRegistry m) => PatchStatus -> TaskId -> m ()
+    :: (MonadEnv m, MonadLog m, MonadRegistry m) => EntryStatus -> TaskId -> m ()
 markTask s tid = do
     Env{tz, now} <- ask
     reg <- get
@@ -112,7 +114,7 @@ markTask s tid = do
 
         logMsg $ "task marked " <> (show s & into & T.toLower) <> ": '" <> name <> "'"
         put
-            $ TR.updateTask tid (fromRight undefined $ TR.modifyTask tz now entry task) reg
+            $ TR.replaceTask tid (fromRight undefined $ TR.modifyTask tz now entry task) reg
 
 deleteTasks
     :: (MonadEnv m, MonadLog m, MonadRegistry m) => HashSet TaskId -> m ()

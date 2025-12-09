@@ -1,5 +1,5 @@
 name: todoCli
-version: 0.3.1
+version: 1.0.0
 github: "githubuser/todoCli"
 license: BSD-3-Clause
 author: "SUHYEON CHOI"
@@ -78,6 +78,8 @@ library:
     - DerivingStrategies
     - MultiParamTypeClasses
     - FunctionalDependencies
+    - FlexibleInstances
+    - DerivingVia
 
 executables:
   todoCli-exe:
@@ -116,6 +118,8 @@ executables:
       - DerivingStrategies
       - MultiParamTypeClasses
       - FunctionalDependencies
+      - FlexibleInstances
+      - DerivingVia
 
 tests:
   todoCli-test:
