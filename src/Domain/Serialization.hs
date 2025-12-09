@@ -37,6 +37,7 @@ instance (Serialize a) => Serializable (UsingCereal a) where
 
 deriving newtype instance Serialize TaskId
 deriving anyclass instance Serialize TaskStatus
+deriving anyclass instance Serialize Deadline
 deriving anyclass instance Serialize Ids
 deriving anyclass instance Serialize Task
 deriving anyclass instance Serialize TodoRegistry

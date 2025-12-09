@@ -3,11 +3,14 @@ module Domain.TodoRegistry
     , TaskId
     , Task
     , TaskStatus
+    , Deadline
     , TaskDetail (..)
     , TaskBasic (..)
     , TaskStatusDetail (..)
+    , TaskDetailDeadline (..)
     , EntryCreate (..)
     , EntryPatch (..)
+    , EntryDeadline (..)
     , PatchStatus (..)
     -- TodoRegistry Construction
     , initTodoRegistry
@@ -43,7 +46,8 @@ import Data.IntMap (IntMap)
 import Data.Map (Map)
 import Data.Maybe (fromMaybe)
 import Data.Text (Text)
-import Data.Time.Clock (NominalDiffTime, UTCTime, addUTCTime)
+import Data.Time.Clock (NominalDiffTime, UTCTime (..), addUTCTime)
+import Data.Time.Calendar (toModifiedJulianDay)
 import Data.Time.LocalTime (TimeZone, utcToLocalTime)
 import GHC.Generics (Generic)
 import Text.Regex.TDFA (Regex, makeRegex, matchTest)
@@ -66,10 +70,10 @@ data TodoRegistry = TodoRegistry
 
 data Task = Task
     { name :: !Text
-    , desc :: !Text
+    , memo :: !TaskMemo
     , tags :: !(HashSet Text)
     , status :: !TaskStatus
-    , deadline :: !UTCTime
+    , deadline :: !Deadline
     }
     deriving (Generic, Show)
 
@@ -82,22 +86,53 @@ instance Hashable TaskStatus where
     hashWithSalt s Done = s `hashWithSalt` (0 :: Int)
     hashWithSalt s Undone = s `hashWithSalt` (1 :: Int)
 
+data Deadline
+    = Boundless
+    | Bound UTCTime
+    deriving (Eq, Generic, Ord, Show)
+
+instance Hashable Deadline where
+    hashWithSalt salt Boundless =
+        salt `hashWithSalt` (0 :: Int)
+    hashWithSalt salt (Bound (UTCTime day diffTime)) =
+        salt `hashWithSalt` (1 :: Int)
+                `hashWithSalt` toModifiedJulianDay day
+                `hashWithSalt` (truncate (diffTime * 1000000000) :: Integer)
+
+data TaskMemo
+    = EmptyMemo
+    | Memo Text
+    deriving (Eq, Generic, Ord, Show)
+
+instance Hashable TaskMemo where
+    hashWithSalt s EmptyMemo = s `hashWithSalt` (0 :: Int)
+    hashWithSalt s (Memo m) = s `hashWithSalt` (1 :: Int) `hashWithSalt` m
+
 data EntryCreate = EntryCreate
     { name :: !Text
-    , desc :: !Text
+    , memo :: !Text
     , tags :: !(HashSet Text)
-    , deadline :: !UTCTime
+    , deadline :: !EntryDeadline
     }
     deriving (Show)
 
 data EntryPatch = EntryPatch
     { name :: !(Maybe Text)
-    , desc :: !(Maybe Text)
+    , memo :: !(Maybe Text)
     , tags :: !(Maybe (HashSet Text))
-    , deadline :: !(Maybe UTCTime)
+    , deadline :: !(Maybe EntryDeadline)
     , status :: !(Maybe PatchStatus)
     }
     deriving (Show)
+
+data EntryDeadline
+    = EBoundless
+    | EBound UTCTime
+    deriving (Show, Generic)
+
+instance From EntryDeadline Deadline where
+    from EBoundless = Boundless
+    from (EBound t) = Bound t
 
 data PatchStatus
     = PDone
@@ -117,10 +152,10 @@ instance From TaskStatus PatchStatus where
 
 data TaskDetail = TaskDetail
     { name :: !Text
-    , desc :: !Text
+    , memo :: !Text
     , tags :: !(HashSet Text)
     , status :: !TaskStatusDetail
-    , deadline :: !UTCTime
+    , deadline :: !TaskDetailDeadline
     }
     deriving (Show)
 
@@ -140,9 +175,18 @@ instance Show TaskStatusDetail where
 instance From TaskStatusDetail Text where
     from = into . show
 
+data TaskDetailDeadline
+    = DBoundless
+    | DBound UTCTime
+    deriving (Show)
+
+instance From Deadline TaskDetailDeadline where
+    from Boundless = DBoundless
+    from (Bound t) = DBound t
+
 data TaskBasic = TaskBasic
     { name :: Text
-    , desc :: Text
+    , memo :: Text
     , tags :: HashSet Text
     }
     deriving (Show)
@@ -205,36 +249,38 @@ getTaskById tid TodoRegistry{idToTask} = IM.lookup (into tid) idToTask
 
 mkTask :: TimeZone -> UTCTime -> EntryCreate -> Either DomainError Task
 mkTask tz now EntryCreate{..}
-    | Left e <- validateDeadline tz now deadline = Left e
-    | otherwise = Right Task{name, deadline, desc, tags, status = Undone}
+    | EBound d <- deadline, Left e <- validateDeadline tz now d = Left e
+    | otherwise = Right Task{name, memo, tags, deadline = into deadline, status = Undone}
 
 modifyTask
     :: TimeZone -> UTCTime -> EntryPatch -> Task -> Either DomainError Task
 modifyTask tz now entry task
-    | Just d <- entry.deadline, Left e <- validateDeadline tz now d = Left e
+    | Just (EBound d) <- entry.deadline, Left e <- validateDeadline tz now d = Left e
     | otherwise =
         Right
             Task
                 { name = fromMaybe task.name entry.name
-                , desc = fromMaybe task.desc entry.desc
+                , memo = fromMaybe task.memo entry.memo
                 , tags = fromMaybe task.tags entry.tags
-                , deadline = fromMaybe task.deadline entry.deadline
+                , deadline = fromMaybe task.deadline (into <$> entry.deadline)
                 , status = maybe task.status into entry.status
                 }
 
 toTaskDetail :: UTCTime -> Task -> TaskDetail
 toTaskDetail now Task{..} =
-    TaskDetail{name, desc, deadline, tags, status = enrichStatus status}
+    TaskDetail{name, memo, tags, deadline = into deadline, status = enrichStatus status}
   where
     enrichStatus :: TaskStatus -> TaskStatusDetail
     enrichStatus Done = DDone
-    enrichStatus Undone
-        | isOverdue now deadline = DOverdue
-        | isDue now deadline = DDue
-        | otherwise = DUndone
+    enrichStatus Undone = case deadline of
+        Boundless -> DUndone
+        Bound d
+            | isOverdue now d -> DOverdue
+            | isDue now d -> DDue
+            | otherwise -> DUndone
 
 toTaskBasic :: Task -> TaskBasic
-toTaskBasic Task{..} = TaskBasic{name, desc, tags}
+toTaskBasic Task{..} = TaskBasic{name, memo, tags}
 
 getAllTasks :: TodoRegistry -> HashSet TaskId
 getAllTasks = getTasksMatching (const True)
@@ -295,7 +341,12 @@ getTasksByStatus s TodoRegistry{statusToId} = M.findWithDefault S.empty s status
 getTasksUndoneAnd :: (UTCTime -> Bool) -> TodoRegistry -> HashSet TaskId
 getTasksUndoneAnd p reg@TodoRegistry{idToTask} =
     getUndoneTasks reg
-        & S.filter (maybe False (\Task{deadline} -> p deadline) . (idToTask IM.!?) . into)
+        & S.filter (predicate . (idToTask IM.!?) . into)
+  where
+    predicate :: Maybe Task -> Bool
+    predicate (Just Task { deadline = Bound x }) = p x
+    predicate (Just Task { deadline = Boundless }) = False
+    predicate Nothing = False
 
 isDue :: UTCTime -> UTCTime -> Bool
 isDue now = liftA2 (&&) (> now) (<= addUTCTime statusDueThreshold now)

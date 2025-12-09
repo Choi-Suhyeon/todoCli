@@ -128,8 +128,8 @@ runCommand (Mark x) = runMarkCommand x
 runCommand (Delete x) = runDeleteCommand x
 
 runAddCommand :: AddCommand -> App ()
-runAddCommand AddCommand{name, deadline, desc, tags} =
-    ask >>= \Env{tz} -> addTask EntryCreate{name, desc, tags, deadline = localTimeToUTC tz deadline}
+runAddCommand AddCommand{name, deadline, memo, tags} = do
+    optionDeadlineToEntryDeadline deadline >>= \utcDeadline -> addTask EntryCreate{name, memo, tags, deadline = utcDeadline}
 
 runListCommand :: ListCommand -> App ()
 runListCommand ListCommand{tags, status} = do
@@ -152,21 +152,21 @@ runListCommand ListCommand{tags, status} = do
     pure ()
 
 runEditCommand :: EditCommand -> App ()
-runEditCommand EditCommand{tgtName, name, deadline, desc, tags} = do
-    Env{tz} <- ask
+runEditCommand EditCommand{tgtName, name, deadline, memo, tags} = do
     target <- getUniqueTarget tgtName
+    utcDeadline <- traverse optionDeadlineToEntryDeadline deadline
 
     let
         entryPatch =
             EntryPatch
                 { name
-                , desc
+                , memo
                 , status = Nothing
+                , deadline = utcDeadline
                 , tags = case tags of
                     Nothing -> Nothing
                     Just Clear -> Just mempty
                     Just (Substitute s) -> Just s
-                , deadline = localTimeToUTC tz <$> deadline
                 }
 
     editTask entryPatch target
@@ -206,3 +206,8 @@ getFromSingleton = (. toList) \case
     [x] -> pure x
     [] -> throwError $ ParserE TargetNotFoundError
     _ -> throwError $ ParserE MultipleTargetsError
+
+
+optionDeadlineToEntryDeadline :: (MonadEnv m) => OptionDeadline -> m EntryDeadline
+optionDeadlineToEntryDeadline Boundless = pure EBoundless
+optionDeadlineToEntryDeadline (Bound d) = ask >>= \Env{tz} -> pure $ EBound $ localTimeToUTC tz d

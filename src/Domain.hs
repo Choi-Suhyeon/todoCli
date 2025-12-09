@@ -6,6 +6,7 @@ module Domain
     , TaskId
     , EntryCreate (..)
     , EntryPatch (..)
+    , EntryDeadline (..)
     , PatchStatus (..)
     , TaskBasic (..)
     , TaskDetail (..)
@@ -45,6 +46,7 @@ import Domain.TaskId
 import Domain.TodoRegistry
     ( EntryCreate
     , EntryPatch (..)
+    , EntryDeadline
     , PatchStatus
     , TaskBasic (..)
     , TaskDetail
@@ -102,7 +104,7 @@ markTask s tid = do
             entry =
                 EntryPatch
                     { name = Nothing
-                    , desc = Nothing
+                    , memo = Nothing
                     , tags = Nothing
                     , deadline = Nothing
                     , status = Just s

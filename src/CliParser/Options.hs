@@ -5,6 +5,8 @@ module CliParser.Options
     , ListCommand (..)
     , EditCommand (..)
     , EditTags (..)
+    , EditMemo (..)
+    , OptionDeadline (..)
     , MarkCommand (..)
     , DeleteCommand (..)
     , ListStatus (..)
@@ -36,10 +38,13 @@ data Command
 
 data AddCommand = AddCommand
     { name :: Text
-    , deadline :: LocalTime
-    , desc :: Text
+    , deadline :: OptionDeadline
+    , memo :: Text
     , tags :: HashSet Text
     }
+    deriving (Generic, Show)
+
+data OptionDeadline = Boundless | Bound LocalTime
     deriving (Generic, Show)
 
 data ListCommand = ListCommand
@@ -51,13 +56,16 @@ data ListCommand = ListCommand
 data EditCommand = EditCommand
     { tgtName :: Text
     , name :: Maybe Text
-    , desc :: Maybe Text
+    , memo :: Maybe EditMemo
     , tags :: Maybe EditTags
-    , deadline :: Maybe LocalTime
+    , deadline :: Maybe OptionDeadline
     }
     deriving (Generic, Show)
 
 data EditTags = Clear | Substitute (HashSet Text)
+    deriving (Generic, Show)
+
+data EditMemo = Remove | Memo Text
     deriving (Generic, Show)
 
 data MarkCommand

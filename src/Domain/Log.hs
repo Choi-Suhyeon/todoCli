@@ -25,22 +25,26 @@ logMsg :: (MonadLog m) => Text -> m ()
 logMsg = tell . into . L.singleton . ("[I] " <>) . (<> "\n")
 
 renderTaskDetail :: TimeZone -> TaskDetail -> Text
-renderTaskDetail tz TaskDetail{name, status, deadline, tags, desc} =
+renderTaskDetail tz TaskDetail{name, status, deadline, tags, memo} =
     T.unlines
         [ "  name:     " <> name
         , "  status:   " <> into status
-        , "  deadline: " <> (deadline & utcToLocalTime tz & iso8601Show & T.pack)
+        , "  deadline: " <> renderDeadline tz deadline
         , "  tags:     " <> renderTags False tags
-        , "  note:     " <> desc
+        , "  note:     " <> liftA2 (bool "N/A") id T.null memo
         ]
 
 renderTaskSummary :: TaskDetail -> Text
 renderTaskSummary TaskDetail{name, status, tags} =
     T.concat [into status, " task '", name, "' ", renderTags True tags]
 
+renderDeadline :: TimeZone -> TaskDetailDeadline -> Text
+renderDeadline _ DBoundless = "N/A"
+renderDeadline tz (DBound d) = utcToLocalTime tz d & iso8601Show & T.pack
+
 renderTags :: Bool -> HashSet Text -> Text
 renderTags delimRequired tags
-    | S.null tags = "(no tags)"
+    | S.null tags = "N/A"
     | otherwise =
         S.toList tags
             & sort

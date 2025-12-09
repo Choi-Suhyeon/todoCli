@@ -152,7 +152,7 @@ pCommand = hsubparser $ cAdd <> cList <> cEdit <> cMark <> cDelete
             $ progDesc "Delete tasks by name, status, or tags"
 
 pAddCommand :: Parser AddCommand
-pAddCommand = AddCommand <$> pName <*> pDeadline <*> pDesc <*> pTags
+pAddCommand = AddCommand <$> pName <*> pDeadline <*> pMemo <*> pTags
   where
     pName :: Parser Text
     pName =
@@ -162,22 +162,23 @@ pAddCommand = AddCommand <$> pName <*> pDeadline <*> pDesc <*> pTags
                 <> metavar "NAME"
                 <> help "Task name"
 
-    pDeadline :: Parser LocalTime
+    pDeadline :: Parser OptionDeadline
     pDeadline =
         option datetimeReader
-            $ short 'D'
+            $ short 'd'
                 <> long "deadline"
                 <> metavar "DEADLINE"
                 <> help
                     "Deadline as YYYY-MM-DD or ISO 8601 datetime; date-only defaults to 23:59:59"
+                <> value Boundless
 
-    pDesc :: Parser Text
-    pDesc =
+    pMemo :: Parser Text
+    pMemo =
         option descReader
-            $ short 'd'
-                <> long "desc"
-                <> metavar "DESCRIPTION"
-                <> help "Task description"
+            $ short 'm'
+                <> long "memo"
+                <> metavar "MEMO"
+                <> help "More information"
                 <> value T.empty
 
     pTags :: Parser (HashSet Text)
@@ -211,7 +212,7 @@ pListCommand = ListCommand <$> pTags <*> pStatus
                 <> help "Filter by task status (done, undone, due, or overdue)"
 
 pEditCommand :: Parser EditCommand
-pEditCommand = EditCommand <$> pTgtName <*> pName <*> pDesc <*> pTags <*> pDeadline
+pEditCommand = EditCommand <$> pTgtName <*> pName <*> pMemo <*> pTags <*> pDeadline
   where
     pTgtName :: Parser Text
     pTgtName = strArgument $ metavar "TARGET_NAME"
@@ -225,14 +226,20 @@ pEditCommand = EditCommand <$> pTgtName <*> pName <*> pDesc <*> pTags <*> pDeadl
                 <> metavar "NEW_NAME"
                 <> help "New task name"
 
-    pDesc :: Parser (Maybe Text)
-    pDesc =
-        optional
-            $ option descReader
-            $ short 'd'
-                <> long "desc"
-                <> metavar "NEW_DESCRIPTION"
-                <> help "New description"
+    pMemo :: Parser (Maybe EditMemo)
+    pMemo = optional $ remove <|> memo
+      where
+        remove =
+            flag' Remove
+                $ short 'M'
+                    <> long "--clear-memo"
+                    <> help "Clear the memo of a target task"
+        memo =
+            option (Memo <$> descReader)
+                $ short 'm'
+                    <> long "memo"
+                    <> metavar "NEW_MEMO"
+                    <> help "New information about the task"
 
     pTags :: Parser (Maybe EditTags)
     pTags = optional $ clear <|> substitute
@@ -241,7 +248,7 @@ pEditCommand = EditCommand <$> pTgtName <*> pName <*> pDesc <*> pTags <*> pDeadl
             flag' Clear
                 $ short 'T'
                     <> long "clear-tag"
-                    <> help "Clear all tags of the target task"
+                    <> help "Clear all tags of a target task"
 
         substitute =
             option (Substitute <$> textSetReader)
@@ -249,25 +256,23 @@ pEditCommand = EditCommand <$> pTgtName <*> pName <*> pDesc <*> pTags <*> pDeadl
                     <> long "tags"
                     <> metavar "NEW_TAGS"
                     <> help "New tags (space-separated)"
-    {--
-    pTags =
-        optional
-            $ option textSetReader
-            $ short 't'
-                <> long "tags"
-                <> metavar "NEW_TAGS"
-                <> help "New tags (space-separated)"
-    --}
 
-    pDeadline :: Parser (Maybe LocalTime)
-    pDeadline =
-        optional
-            $ option datetimeReader
-            $ short 'D'
-                <> long "deadline"
-                <> metavar "NEW_DEADLINE"
-                <> help
-                    "New deadline as YYYY-MM-DD or ISO 8601 datetime; date-only defaults to 23:59:59"
+    pDeadline :: Parser (Maybe OptionDeadline)
+    pDeadline = optional $ boundless <|> bound
+      where
+        boundless =
+            flag' Boundless
+                $ short 'D'
+                    <> long "clear-deadline"
+                    <> help "Clear the deadline of a target task"
+
+        bound =
+            option datetimeReader
+                $ short 'd'
+                    <> long "deadline"
+                    <> metavar "NEW_DEADLINE"
+                    <> help
+                        "New deadline as YYYY-MM-DD or ISO 8601 datetime; date-only defaults to 23:59:59"
 
 pMarkCommand :: Parser MarkCommand
 pMarkCommand =
@@ -322,12 +327,12 @@ nameReader = maybeReader $ liftA2 (bool Nothing) (Just . T.pack) ((<= 30) . leng
 descReader :: ReadM Text
 descReader = maybeReader $ liftA2 (bool Nothing) (Just . T.pack) ((<= 60) . length)
 
-datetimeReader :: ReadM LocalTime
+datetimeReader :: ReadM OptionDeadline
 datetimeReader =
     maybeReader
         $ (<|>)
-            <$> fmap fromDayToLocalTime . parseFormatExtension calendarFormat
-            <*> iso8601ParseM
+            <$> fmap (Bound . fromDayToLocalTime) . parseFormatExtension calendarFormat
+            <*> fmap Bound . iso8601ParseM
   where
     fromDayToLocalTime :: Day -> LocalTime
     fromDayToLocalTime = (`LocalTime` TimeOfDay 23 59 59)
