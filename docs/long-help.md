@@ -22,11 +22,13 @@ Each command may define define its own flags, but several input rules or concept
 
 ### Dates and Time
 The `DEADLINE` field accepts either a date or a full ISO-8601 **local** datetime.
+
 - Date only: YYYY-MM-DD 
   - time defaults to 23:59:59
 - Date with time: YYYY-MM-DDTHH:MM:SS
 
 Additional rules:
+
 - Timezones or UTC offsets are not allowed.
 - All values are interpreted as local time.
 
@@ -40,14 +42,15 @@ allowed statuses:
 
 ### Target Selection
 Commands such as `edit`, `mark`, and `delete` require selecting one or more target tasks.
+
 - A task may be targeted by providing a regular expression that matches its name.
 - For the `delete` command, multiple targets are allowed.
 - For `edit` and `mark`, exactly one target must be specified.
 
 ### Filters
-- list and delete apply all provided filters with AND (no OR).
-- Tag filters are also ANDed: a task matches only if its tags include all provided tags.
+- The `list` and `delete` commands apply all provided filters using logical AND (no OR is supported).
+- Tag filters are also ANDed: a task matches only if it contains all of the specified tags.
 
 ### Logging
-By default, successful commands produce no output, following the Unix tradition of “silence on success.”
+By default, successful commands produce no output, following the Unix tradition of "silence on success."
 However, you can enable the global `--verbose` flag to display additional information about successful operations.

@@ -1,6 +1,9 @@
+{-# LANGUAGE TemplateHaskell #-}
+
 module CliParser (module CliParser.Options, parseOpts) where
 
 import Control.Monad (mfilter)
+import Data.ByteString (ByteString)
 import Data.Bool (bool)
 import Data.HashSet (HashSet)
 import Data.Text (Text)
@@ -14,12 +17,15 @@ import Data.Time.LocalTime (LocalTime (..), TimeOfDay (..))
 import Data.Version (showVersion)
 import Options.Applicative
 import Text.Regex.TDFA ((=~))
+import Witch
 
 import Data.HashSet qualified as S
 import Data.Text qualified as T
+import qualified Data.Text.Encoding as TE
 
 import CliParser.Options
 import Paths_todoCli (version)
+import Data.FileEmbed (embedFile)
 
 parseOpts :: IO Options
 parseOpts = execParser opts
@@ -28,8 +34,7 @@ opts :: ParserInfo Options
 opts =
     info (pOptions <**> helper <**> longHelpOpt <**> versionOpt)
         $ fullDesc
-            <> progDesc
-                "Organize and track tasks from the command line with commands to add, list, edit, mark, rename, and delete."
+            <> progDesc "Manage your tasks from the command line"
             <> header (progName <> " - A simple command-line task manager")
 
 progName :: String
@@ -40,76 +45,16 @@ versionOpt = simpleVersioner $ showVersion version
 
 longHelpOpt :: Parser (a -> a)
 longHelpOpt =
-    infoOption (helpAndExtra opts)
+    infoOption longHelpStr
         $ hidden
-            <> long "long-help"
-            <> help "Show extended help"
+        <> long "long-help"
+        <> help "Show extended help"
   where
-    helpAndExtra :: ParserInfo a -> String
-    helpAndExtra pInfo = helpText <> "\n\n" <> extendedText
-      where
-        failure = parserFailure (prefs $ columns 80) pInfo (ShowHelpText Nothing) mempty
-        helpText = fst $ renderFailure failure progName
+    longHelpStr :: String
+    longHelpStr = into $ TE.decodeUtf8 longHelpRaw
 
-    extendedText :: String
-    extendedText =
-        unlines
-            [ "Overview:"
-            , "  A minimal CLI to add, list, edit, mark, and delete tasks"
-            , "  Commands may have their own flags, but common input rules are shared"
-            , ""
-            , "Tags:"
-            , "  - Provide tags as a space-separated string (e.g., \"work urgent home\")"
-            , "  - Letters A–Z only; case-insensitive (stored uppercased); no digits or symbols"
-            , "  - Up to 10 tags; duplicates are ignored; order does not matter"
-            , ""
-            , "Dates & time:"
-            , "  - DEADLINE accepts either a date or a full ISO-8601 local datetime"
-            , "    • Date: YYYY-MM-DD  (time defaults to 23:59:59)"
-            , "    • Datetime: YYYY-MM-DDTHH:MM:SS"
-            , "  - Timezones/offsets are not accepted; values are treated as local time"
-            , ""
-            , "Status values:"
-            , "  - list:    done | undone | due | overdue"
-            , "  - delete:  done | overdue"
-            , "  (Each command only accepts the statuses listed for that command)"
-            , ""
-            , "Structure (grammar):"
-            , "  "
-                <> progName
-                <> " add    (-n|--name NAME) (-D|--deadline DEADLINE) [-d|--desc DESCRIPTION] [-t|--tags TAGS]"
-            , "  " <> progName <> " list   [-t|--tags TAGS] [-s|--status STATUS]"
-            , "  "
-                <> progName
-                <> " edit   TARGET_NAME [-n|--name NEW_NAME] [-d|--desc NEW_DESCRIPTION] [-t|--tags NEW_TAGS] [-D|--deadline NEW_DEADLINE]"
-            , "  " <> progName <> " mark   (done|undone) NAME"
-            , "  "
-                <> progName
-                <> " delete (all | by [-n|--name NAME] [-t|--tags TAGS] [-s|--status STATUS])"
-            , ""
-            , "Notes:"
-            , "  - TAGS is one argument; put all tags in the same quoted string if needed"
-            , "  - NAME/DESCRIPTION are free text; quote when they contain spaces"
-            , "  - For command-specific flags and details, run: <command> --help"
-            , ""
-            , "Behavior:"
-            , "  - list and delete apply all provided filters with AND (no OR)"
-            , "  - Tag filters are also ANDed: a task matches only if its tags include all provided tags"
-            , "  - Name matching (edit/mark/delete): substring match on TARGET_NAME/NAME;"
-            , "    if it doesn't resolve to exactly one task, the command errors"
-            , ""
-            , "Examples:"
-            , "  $ "
-                <> progName
-                <> " add -n \"Pay bills\" -d \"Electricity and water\" -D 2025-09-01 -t \"finance urgent\""
-            , "  $ " <> progName <> " list -s due -t \"finance\""
-            , "  $ "
-                <> progName
-                <> " edit \"Pay bills\" --deadline 2025-09-02T10:00 --tags \"finance\""
-            , "  $ " <> progName <> " mark done \"Pay bills\""
-            , "  $ " <> progName <> " delete by -s overdue -t \"finance\""
-            , "  $ " <> progName <> " delete all"
-            ]
+    longHelpRaw :: ByteString
+    longHelpRaw = $(embedFile "docs/long-help.txt")
 
 pOptions :: Parser Options
 pOptions = Options <$> pCommand <*> pVerbose
@@ -129,7 +74,7 @@ pCommand = hsubparser $ cAdd <> cList <> cEdit <> cMark <> cDelete
     cAdd =
         command "add"
             $ info (Add <$> pAddCommand)
-            $ progDesc "Add a new task with name, description, deadline, and optional tags"
+            $ progDesc "Add a new task with name, memo, deadline, and tags"
 
     cList =
         command "list"
@@ -149,7 +94,7 @@ pCommand = hsubparser $ cAdd <> cList <> cEdit <> cMark <> cDelete
     cDelete =
         command "delete"
             $ info (Delete <$> pDeleteCommand)
-            $ progDesc "Delete tasks by name, status, or tags"
+            $ progDesc "Delete all tasks or delete selectively by filters"
 
 pAddCommand :: Parser AddCommand
 pAddCommand = AddCommand <$> pName <*> pDeadline <*> pMemo <*> pTags
@@ -169,7 +114,7 @@ pAddCommand = AddCommand <$> pName <*> pDeadline <*> pMemo <*> pTags
                 <> long "deadline"
                 <> metavar "DEADLINE"
                 <> help
-                    "Deadline as YYYY-MM-DD or ISO 8601 datetime; date-only defaults to 23:59:59"
+                    "Deadline (YYYY-MM-DD or ISO 8601 datetime; time defaults to 23:59:59)"
                 <> value Boundless
 
     pMemo :: Parser Text
@@ -178,7 +123,7 @@ pAddCommand = AddCommand <$> pName <*> pDeadline <*> pMemo <*> pTags
             $ short 'm'
                 <> long "memo"
                 <> metavar "MEMO"
-                <> help "More information"
+                <> help "Additional task information"
                 <> value T.empty
 
     pTags :: Parser (HashSet Text)
@@ -187,7 +132,7 @@ pAddCommand = AddCommand <$> pName <*> pDeadline <*> pMemo <*> pTags
             $ short 't'
                 <> long "tags"
                 <> metavar "TAGS"
-                <> help "Space-separated tags (max 10)"
+                <> help "Space-separated tags (maximum 10)"
                 <> value S.empty
 
 pListCommand :: Parser ListCommand
@@ -209,13 +154,13 @@ pListCommand = ListCommand <$> pTags <*> pStatus
             $ short 's'
                 <> long "status"
                 <> metavar "STATUS"
-                <> help "Filter by task status (done, undone, due, or overdue)"
+                <> help "Filter by status (done, undone, due, overdue)"
 
 pEditCommand :: Parser EditCommand
 pEditCommand = EditCommand <$> pTgtName <*> pName <*> pMemo <*> pTags <*> pDeadline
   where
     pTgtName :: Parser Text
-    pTgtName = strArgument $ metavar "TARGET_NAME"
+    pTgtName = strArgument $ metavar "NAME_PATTERN"
 
     pName :: Parser (Maybe Text)
     pName =
@@ -223,7 +168,7 @@ pEditCommand = EditCommand <$> pTgtName <*> pName <*> pMemo <*> pTags <*> pDeadl
             $ option nameReader
             $ short 'n'
                 <> long "name"
-                <> metavar "NEW_NAME"
+                <> metavar "NAME"
                 <> help "New task name"
 
     pMemo :: Parser (Maybe EditMemo)
@@ -232,14 +177,14 @@ pEditCommand = EditCommand <$> pTgtName <*> pName <*> pMemo <*> pTags <*> pDeadl
         remove =
             flag' Remove
                 $ short 'M'
-                    <> long "--clear-memo"
-                    <> help "Clear the memo of a target task"
+                    <> long "clear-memo"
+                    <> help "Clear the task memo"
         memo =
             option (Memo <$> descReader)
                 $ short 'm'
                     <> long "memo"
-                    <> metavar "NEW_MEMO"
-                    <> help "New information about the task"
+                    <> metavar "MEMO"
+                    <> help "New additional task information"
 
     pTags :: Parser (Maybe EditTags)
     pTags = optional $ clear <|> substitute
@@ -248,13 +193,13 @@ pEditCommand = EditCommand <$> pTgtName <*> pName <*> pMemo <*> pTags <*> pDeadl
             flag' Clear
                 $ short 'T'
                     <> long "clear-tag"
-                    <> help "Clear all tags of a target task"
+                    <> help "Clear all task tags"
 
         substitute =
             option (Substitute <$> textSetReader)
                 $ short 't'
                     <> long "tags"
-                    <> metavar "NEW_TAGS"
+                    <> metavar "TAGS"
                     <> help "New tags (space-separated)"
 
     pDeadline :: Parser (Maybe OptionDeadline)
@@ -264,15 +209,15 @@ pEditCommand = EditCommand <$> pTgtName <*> pName <*> pMemo <*> pTags <*> pDeadl
             flag' Boundless
                 $ short 'D'
                     <> long "clear-deadline"
-                    <> help "Clear the deadline of a target task"
+                    <> help "Clear the task deadline"
 
         bound =
             option datetimeReader
                 $ short 'd'
                     <> long "deadline"
-                    <> metavar "NEW_DEADLINE"
+                    <> metavar "DEADLINE"
                     <> help
-                        "New deadline as YYYY-MM-DD or ISO 8601 datetime; date-only defaults to 23:59:59"
+                        "New deadline (YYYY-MM-DD or ISO 8601 datetime; time defaults to 23:59:59)"
 
 pMarkCommand :: Parser MarkCommand
 pMarkCommand =
@@ -282,7 +227,7 @@ pMarkCommand =
             <> metavar "COMMAND"
   where
     pName :: Parser Text
-    pName = strArgument $ metavar "NAME"
+    pName = strArgument $ metavar "NAME_PATTERN"
 
 pDeleteCommand :: Parser DeleteCommand
 pDeleteCommand =
@@ -300,7 +245,7 @@ pDeleteCommand =
             $ option nameReader
             $ short 'n'
                 <> long "name"
-                <> metavar "NAME"
+                <> metavar "NAME_PATTERN"
                 <> help "Filter by task name"
 
     pByTags :: Parser (Maybe (HashSet Text))
@@ -319,7 +264,7 @@ pDeleteCommand =
             $ short 's'
                 <> long "status"
                 <> metavar "STATUS"
-                <> help "Filter by task status (done or overdue)"
+                <> help "Filter by task status (done, overdue)"
 
 nameReader :: ReadM Text
 nameReader = maybeReader $ liftA2 (bool Nothing) (Just . T.pack) ((<= 30) . length)

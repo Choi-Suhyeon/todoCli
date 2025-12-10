@@ -10,6 +10,10 @@ extra-source-files:
   - README.md
   - CHANGELOG.md
 
+data-files:
+  - docs/long-help.txt
+  - docs/todoCli.1
+
 # Metadata used when publishing your package
 # synopsis:            Short description of your package
 # category:            Web
@@ -23,11 +27,13 @@ dependencies:
   - base
   - optparse-applicative
   - unordered-containers
+  - template-haskell
   - generic-lens
   - transformers
   - regex-tdfa
   - bytestring
   - containers
+  - file-embed
   - microlens
   - directory
   - filepath

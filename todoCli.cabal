@@ -1,11 +1,11 @@
 cabal-version: 2.2
 
--- This file has been generated from package.yaml by hpack version 0.38.0.
+-- This file has been generated from package.yaml by hpack version 0.38.1.
 --
 -- see: https://github.com/sol/hpack
 
 name:           todoCli
-version:        0.3.1
+version:        1.0.0
 description:    Please see the README on GitHub at <https://github.com/githubuser/todoCli#readme>
 homepage:       https://github.com/githubuser/todoCli#readme
 bug-reports:    https://github.com/githubuser/todoCli/issues
@@ -18,6 +18,9 @@ build-type:     Simple
 extra-source-files:
     README.md
     CHANGELOG.md
+data-files:
+    docs/long-help.txt
+    docs/todoCli.1
 
 source-repository head
   type: git
@@ -87,6 +90,7 @@ library
     , cereal
     , containers
     , directory
+    , file-embed
     , filepath
     , generic-lens
     , hashable
@@ -94,6 +98,7 @@ library
     , mtl
     , optparse-applicative
     , regex-tdfa
+    , template-haskell
     , text
     , time
     , transformers
@@ -146,6 +151,7 @@ executable todoCli-exe
     , cereal
     , containers
     , directory
+    , file-embed
     , filepath
     , generic-lens
     , hashable
@@ -153,6 +159,7 @@ executable todoCli-exe
     , mtl
     , optparse-applicative
     , regex-tdfa
+    , template-haskell
     , text
     , time
     , todoCli
@@ -178,6 +185,7 @@ test-suite todoCli-test
     , cereal
     , containers
     , directory
+    , file-embed
     , filepath
     , generic-lens
     , hashable
@@ -185,6 +193,7 @@ test-suite todoCli-test
     , mtl
     , optparse-applicative
     , regex-tdfa
+    , template-haskell
     , text
     , time
     , todoCli
