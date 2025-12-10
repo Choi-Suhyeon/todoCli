@@ -1,4 +1,6 @@
-todoCli
+todo
+
+A simple command-line task manager
 
 Overview
 

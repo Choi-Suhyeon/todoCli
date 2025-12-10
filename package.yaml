@@ -1,10 +1,10 @@
-name: todoCli
-version: 1.0.0
+name: todo
+version: 2.0.0
 github: "githubuser/todoCli"
 license: BSD-3-Clause
 author: "SUHYEON CHOI"
 maintainer: "1AzyF0x@protonmail.ch"
-copyright: "2025 Author name here"
+copyright: "2025 1AzyF0x(SUHYEON CHOI)"
 
 extra-source-files:
   - README.md
@@ -12,7 +12,7 @@ extra-source-files:
 
 data-files:
   - docs/long-help.txt
-  - docs/todoCli.1
+  - docs/todo.1
 
 # Metadata used when publishing your package
 # synopsis:            Short description of your package
@@ -88,7 +88,7 @@ library:
     - DerivingVia
 
 executables:
-  todoCli-exe:
+  todo:
     main: Main.hs
     source-dirs: app
     ghc-options:
@@ -96,7 +96,7 @@ executables:
       - -rtsopts
       - -with-rtsopts=-N
     dependencies:
-      - todoCli
+      - todo
     default-extensions:
       - ImportQualifiedPost
       - OverloadedStrings
@@ -136,4 +136,4 @@ tests:
       - -rtsopts
       - -with-rtsopts=-N
     dependencies:
-      - todoCli
+      - todo

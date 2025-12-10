@@ -1,5 +1,7 @@
 # todoCli
 
+A simple command-line task manager
+
 ## Overview
 This program provides a minimal command-line interface for managing tasks.
 It supports adding, listing, editing, marking, and deleting tasks.

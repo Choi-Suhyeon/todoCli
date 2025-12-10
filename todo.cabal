@@ -4,14 +4,14 @@ cabal-version: 2.2
 --
 -- see: https://github.com/sol/hpack
 
-name:           todoCli
-version:        1.0.0
+name:           todo
+version:        2.0.0
 description:    Please see the README on GitHub at <https://github.com/githubuser/todoCli#readme>
 homepage:       https://github.com/githubuser/todoCli#readme
 bug-reports:    https://github.com/githubuser/todoCli/issues
 author:         SUHYEON CHOI
 maintainer:     1AzyF0x@protonmail.ch
-copyright:      2025 Author name here
+copyright:      2025 1AzyF0x(SUHYEON CHOI)
 license:        BSD-3-Clause
 license-file:   LICENSE
 build-type:     Simple
@@ -20,7 +20,7 @@ extra-source-files:
     CHANGELOG.md
 data-files:
     docs/long-help.txt
-    docs/todoCli.1
+    docs/todo.1
 
 source-repository head
   type: git
@@ -48,9 +48,9 @@ library
       Effect.Persistence
       View
   other-modules:
-      Paths_todoCli
+      Paths_todo
   autogen-modules:
-      Paths_todoCli
+      Paths_todo
   hs-source-dirs:
       src
   default-extensions:
@@ -106,12 +106,12 @@ library
     , witch
   default-language: Haskell2010
 
-executable todoCli-exe
+executable todo
   main-is: Main.hs
   other-modules:
-      Paths_todoCli
+      Paths_todo
   autogen-modules:
-      Paths_todoCli
+      Paths_todo
   hs-source-dirs:
       app
   default-extensions:
@@ -162,7 +162,7 @@ executable todoCli-exe
     , template-haskell
     , text
     , time
-    , todoCli
+    , todo
     , transformers
     , unordered-containers
     , witch
@@ -172,9 +172,9 @@ test-suite todoCli-test
   type: exitcode-stdio-1.0
   main-is: Spec.hs
   other-modules:
-      Paths_todoCli
+      Paths_todo
   autogen-modules:
-      Paths_todoCli
+      Paths_todo
   hs-source-dirs:
       test
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
@@ -196,7 +196,7 @@ test-suite todoCli-test
     , template-haskell
     , text
     , time
-    , todoCli
+    , todo
     , transformers
     , unordered-containers
     , witch

@@ -1,6 +1,6 @@
 INPUT_MD = ./docs/long-help.md
 OUTPUT_TXT = ./docs/long-help.txt
-OUTPUT_MAN = ./docs/todoCli.1
+OUTPUT_MAN = ./docs/todo.1
 
 .PHONY: all
 all: build-haskell
@@ -21,7 +21,7 @@ install: $(OUTPUT_MAN)
 	if [ "$$SYSTEM_NAME" = "Linux" ] || [ "$$SYSTEM_NAME" = "Darwin" ]; then \
 		MAN_INSTALL_DIR=/usr/local/share/man/man1; \
 		sudo mkdir -p $$MAN_INSTALL_DIR; \
-		sudo install -m 0644 $< $$MAN_INSTALL_DIR/todoCli.1; \
+		sudo install -m 0644 $< $$MAN_INSTALL_DIR/todo.1; \
     fi
 
 .PHONY: clean

@@ -24,7 +24,7 @@ import Data.Text qualified as T
 import qualified Data.Text.Encoding as TE
 
 import CliParser.Options
-import Paths_todoCli (version)
+import Paths_todo (version)
 import Data.FileEmbed (embedFile)
 
 parseOpts :: IO Options
@@ -38,7 +38,7 @@ opts =
             <> header (progName <> " - A simple command-line task manager")
 
 progName :: String
-progName = "todoCli"
+progName = "todo"
 
 versionOpt :: Parser (a -> a)
 versionOpt = simpleVersioner $ showVersion version
