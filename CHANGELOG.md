@@ -6,12 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
-### Added
-- Support for setting relative deadlines.
-- Global `--interactive` flag.
-
-### Changed
-- Refactored code to reduce dependencies on the `lens` package.
+_No unreleased changes yet._
 
 ## [2.0.0] - 2025-12-10
 
