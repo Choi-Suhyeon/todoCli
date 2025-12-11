@@ -10,21 +10,3 @@ sort-constraints: true
 sort-derived-classes: true
 sort-deriving-clauses: true
 trailing-section-operators: false
-local-modules:
-  - CliParser
-  - CliParser.Options
-  - Common
-  - Common.Env
-  - Common.Util
-  - Common.Optics
-  - Common.AbstractError
-  - Domain
-  - Domain.Type
-  - Domain.Type.Internal
-  - Domain.Error
-  - Domain.Internal
-  - Domain.Serialization
-  - Effect
-  - Effect.Error
-  - Effect.Format
-  - Effect.Persistence

@@ -1,11 +1,38 @@
-# Changelog for `todoCli`
+# Changelog for `todo`
 
 All notable changes to this project will be documented in this file.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to the
-[Haskell Package Versioning Policy](https://pvp.haskell.org/).
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-## Unreleased
+## [Unreleased]
 
-## 0.1.0.0 - YYYY-MM-DD
+### Added
+- Support for setting relative deadlines.
+- Global `--interactive` flag.
+
+### Changed
+- Refactored code to reduce dependencies on the `lens` package.
+
+## [2.0.0] - 2025-12-10
+
+### Added
+- Added brief descriptions to `long-help.md` and `README.md`.
+
+### Changed
+- [BREAKING] Program name changed from `todoCli` to `todo`.
+- Removed the `local-modules` section from `fourmolu.yaml`.
+
+## [1.x] - Summary
+
+### Added
+- Added global flag `--verbose`.
+- Added flags `-m` and `-M` for setting and unsetting a task memo (previously called "description").
+- Added support for tasks with no deadline (boundless deadline).
+
+### Changed
+- [BREAKING] Reassigned meanings of flags `-d` and `-D`.  
+  - Previously: `-d` set a description, `-D` set a deadline.  
+  - Now: `-d` sets a deadline, `-D` unsets a deadline.
+
+### Notes
+- For detailed changes, refer to the GitHub commit history.
