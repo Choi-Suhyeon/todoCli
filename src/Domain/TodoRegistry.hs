@@ -49,6 +49,7 @@ import Data.Hashable (Hashable (..))
 import Data.IntMap (IntMap)
 import Data.Map (Map)
 import Data.Maybe (fromMaybe)
+import Data.Serialize (Serialize (..))
 import Data.String (IsString (..))
 import Data.Text (Text)
 import Data.Time.Calendar (toModifiedJulianDay)
@@ -56,15 +57,14 @@ import Data.Time.Clock (NominalDiffTime, UTCTime (..), addUTCTime)
 import Data.Time.LocalTime (TimeZone, utcToLocalTime)
 import GHC.Generics (Generic)
 import Text.Regex.TDFA (Regex, makeRegex, matchTest)
-import Data.Serialize (Serialize (..))
 import Witch
 
 import Data.HashSet qualified as S
 import Data.IntMap qualified as IM
 import Data.Map qualified as M
 
-import Domain.Serialization.CerealOrphans ()
 import Domain.Error
+import Domain.Serialization.CerealOrphans ()
 import Domain.TaskId
 
 data TodoRegistry = TodoRegistry

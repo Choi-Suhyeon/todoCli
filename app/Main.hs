@@ -209,7 +209,7 @@ getFromSingleton = (. toList) \case
     [] -> throwError $ ParserE TargetNotFoundError
     _ -> throwError $ ParserE MultipleTargetsError
 
-
-optionDeadlineToEntryDeadline :: (MonadEnv m) => OptionDeadline -> m EntryDeadline
+optionDeadlineToEntryDeadline
+    :: (MonadEnv m) => OptionDeadline -> m EntryDeadline
 optionDeadlineToEntryDeadline Boundless = pure EBoundless
 optionDeadlineToEntryDeadline (Bound d) = ask >>= \Env{tz} -> pure $ EBound $ localTimeToUTC tz d

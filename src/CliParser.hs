@@ -3,8 +3,9 @@
 module CliParser (module CliParser.Options, parseOpts) where
 
 import Control.Monad (mfilter)
-import Data.ByteString (ByteString)
 import Data.Bool (bool)
+import Data.ByteString (ByteString)
+import Data.FileEmbed (embedFile)
 import Data.HashSet (HashSet)
 import Data.Text (Text)
 import Data.Time.Calendar (Day (..))
@@ -21,11 +22,10 @@ import Witch
 
 import Data.HashSet qualified as S
 import Data.Text qualified as T
-import qualified Data.Text.Encoding as TE
+import Data.Text.Encoding qualified as TE
 
 import CliParser.Options
 import Paths_todo (version)
-import Data.FileEmbed (embedFile)
 
 parseOpts :: IO Options
 parseOpts = execParser opts
@@ -47,8 +47,8 @@ longHelpOpt :: Parser (a -> a)
 longHelpOpt =
     infoOption longHelpStr
         $ hidden
-        <> long "long-help"
-        <> help "Show extended help"
+            <> long "long-help"
+            <> help "Show extended help"
   where
     longHelpStr :: String
     longHelpStr = into $ TE.decodeUtf8 longHelpRaw

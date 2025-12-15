@@ -6,7 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
-_No unreleased changes yet._
+### Add
+- Added Dhall configuration files (`package.dhall`, `stack.dhall`, `hie.dhall`, `fourmolu.dhall`) to minimize repetition and cognitive overhead in YAML configs.
 
 ## [2.0.0] - 2025-12-10
 

@@ -6,11 +6,11 @@ module Domain.TaskId
     , releaseId
     ) where
 
-import Data.Serialize (Serialize)
 import Data.Bifunctor (bimap)
 import Data.Generics.Labels ()
 import Data.Hashable (Hashable)
 import Data.IntSet (IntSet)
+import Data.Serialize (Serialize)
 import Data.Tuple (swap)
 import Witch
 

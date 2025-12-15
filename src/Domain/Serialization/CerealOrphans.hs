@@ -2,12 +2,16 @@
 
 module Domain.Serialization.CerealOrphans () where
 
-import Data.Time.Clock.POSIX (POSIXTime, utcTimeToPOSIXSeconds, posixSecondsToUTCTime)
-import Data.Time.Clock (UTCTime (..))
-import Data.Serialize (Serialize (..))
-import Data.Hashable (Hashable)
 import Data.HashSet (HashSet)
+import Data.Hashable (Hashable)
+import Data.Serialize (Serialize (..))
 import Data.Text (Text)
+import Data.Time.Clock (UTCTime (..))
+import Data.Time.Clock.POSIX
+    ( POSIXTime
+    , posixSecondsToUTCTime
+    , utcTimeToPOSIXSeconds
+    )
 
 import Data.HashSet qualified as HS
 import Data.Text qualified as T

@@ -46,8 +46,8 @@ import Domain.Log
 import Domain.TaskId
 import Domain.TodoRegistry
     ( EntryCreation
-    , EntryPatch (..)
     , EntryDeadline
+    , EntryPatch (..)
     , EntryStatus
     , TaskBasic (..)
     , TaskDetail

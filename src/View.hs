@@ -1,16 +1,16 @@
 module View (initTaskDetailRenderConfig, sortTaskDetails) where
 
+import Data.Foldable (Foldable (..))
+import Data.Function ((&))
 import Data.List (sort, sortBy)
 import Data.Ord (Down (..), comparing)
 import Data.Time.Format.ISO8601 (iso8601Show)
-import Data.Foldable (Foldable (..))
 import Data.Time.LocalTime (TimeZone, utcToLocalTime)
-import Data.Function ((&))
 import Witch
 
 import Data.Text qualified as T
 
-import Domain (TaskDetail (..), TaskDetailStatus (..), TaskDetailDeadline (..))
+import Domain (TaskDetail (..), TaskDetailDeadline (..), TaskDetailStatus (..))
 import Effect.Format
 
 data ColNameTaskDetail
@@ -44,25 +44,25 @@ initTaskDetailRenderConfig tz =
         }
   where
     renderStatus :: TaskDetail -> String
-    renderStatus TaskDetail{status=DOverdue} = "[X]"
-    renderStatus TaskDetail{status=DDue} = "[!]"
-    renderStatus TaskDetail{status=DUndone} = "[U]"
-    renderStatus TaskDetail{status=DDone} = "[O]"
+    renderStatus TaskDetail{status = DOverdue} = "[X]"
+    renderStatus TaskDetail{status = DDue} = "[!]"
+    renderStatus TaskDetail{status = DUndone} = "[U]"
+    renderStatus TaskDetail{status = DDone} = "[O]"
 
     renderName :: TaskDetail -> String
-    renderName TaskDetail{name=n} = into n
+    renderName TaskDetail{name = n} = into n
 
     renderDeadline :: TaskDetail -> String
-    renderDeadline TaskDetail{deadline=DBoundless} = "N/A"
-    renderDeadline TaskDetail{deadline=DBound d} = d & utcToLocalTime tz & iso8601Show
+    renderDeadline TaskDetail{deadline = DBoundless} = "N/A"
+    renderDeadline TaskDetail{deadline = DBound d} = d & utcToLocalTime tz & iso8601Show
 
     renderTags :: TaskDetail -> String
-    renderTags TaskDetail{tags=ts}
+    renderTags TaskDetail{tags = ts}
         | null ts = "N/A"
         | otherwise = toList ts & sort & T.intercalate ", " & into
 
     renderMemo :: TaskDetail -> String
-    renderMemo TaskDetail{memo=m}
+    renderMemo TaskDetail{memo = m}
         | T.null m = "N/A"
         | otherwise = into m
 
