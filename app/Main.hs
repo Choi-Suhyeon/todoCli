@@ -3,29 +3,18 @@
 module Main (main) where
 
 import Control.Exception (ErrorCall, evaluate, try)
-import Control.Monad ((>=>))
-import Control.Monad.Except (ExceptT (..), MonadError, runExceptT, throwError)
-import Control.Monad.IO.Class (MonadIO (..))
-import Control.Monad.Reader (MonadReader, ReaderT, asks, runReaderT)
-import Control.Monad.State.Strict (MonadState, StateT, runStateT)
-import Control.Monad.Writer.Strict (MonadWriter, WriterT, censor, runWriterT)
-import Data.Bool (bool)
-import Data.Either (fromRight)
-import Data.Foldable (toList)
-import Data.Function ((&))
-import Data.Maybe (catMaybes, maybeToList)
 import Data.Text (Text)
 import Data.Time.Clock (getCurrentTime)
 import Data.Time.LocalTime (getCurrentTimeZone, localTimeToUTC)
 import System.Exit (exitFailure, exitSuccess)
 import System.IO (stderr)
-import Witch
 
 import Data.HashSet qualified as HS
 import Data.Text.IO qualified as TIO
 
 import CliParser
 import Common
+import Common.Prelude
 import Domain
 import Domain.Serialization
 import Effect

@@ -1,9 +1,9 @@
 module Domain.Serialization (Serializable (..), UsingCereal (..)) where
 
-import Data.Bifunctor (bimap)
 import Data.ByteString (ByteString)
 import Data.Serialize (Serialize (..), decode, encode)
 
+import Common.Prelude
 import Domain.Error
 
 class Serializable a where

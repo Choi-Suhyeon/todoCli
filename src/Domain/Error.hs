@@ -1,10 +1,10 @@
 module Domain.Error (MonadDomainError, DomainError (..)) where
 
-import Control.Monad.Except (MonadError (..))
 import Data.Time.Format.ISO8601 (iso8601Show)
 import Data.Time.LocalTime (LocalTime)
 import Text.Printf (printf)
-import Witch
+
+import Common.Prelude
 
 type MonadDomainError e m = (MonadError e m, From DomainError e)
 

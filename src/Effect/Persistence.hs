@@ -1,8 +1,6 @@
 module Effect.Persistence (readData, writeData) where
 
 import Control.Exception (Exception, IOException, bracketOnError, try)
-import Control.Monad (when)
-import Control.Monad.IO.Class (MonadIO (..))
 import Data.ByteString (ByteString, hPutStr, readFile)
 import System.Directory
     ( XdgDirectory (..)
@@ -14,9 +12,9 @@ import System.Directory
     )
 import System.FilePath ((<.>), (</>))
 import System.IO (hClose, openBinaryTempFile)
-import Prelude hiding (readFile)
 
 import Common
+import Common.Prelude hiding (readFile)
 import Effect.Error
 
 readData :: (MonadEffectError e m, MonadIO m) => m ByteString

@@ -13,12 +13,13 @@ module CliParser.Options
     , DeleteStatus (..)
     ) where
 
-import Data.Char (isSpace)
 import Data.HashSet (HashSet)
 import Data.Text (Text)
 import Data.Time.LocalTime (LocalTime)
 
 import Data.Text qualified as T
+
+import Common.Prelude
 
 data Options = Options
     { optCommand :: Command

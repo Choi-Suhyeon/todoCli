@@ -6,6 +6,7 @@ module Domain.TaskId
     , releaseId
     ) where
 
+import Prelude
 import Control.Monad (unless)
 import Data.Bifunctor (first)
 import Data.Hashable (Hashable)

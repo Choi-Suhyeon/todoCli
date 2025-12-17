@@ -42,27 +42,22 @@ module Domain.TodoRegistry
 where
 
 import Data.Fixed (Pico)
-import Data.Function (on, (&))
-import Data.Functor ((<&>))
 import Data.HashSet (HashSet)
 import Data.Hashable (Hashable (..))
 import Data.IntMap (IntMap)
 import Data.Map (Map)
-import Data.Maybe (fromMaybe)
 import Data.Serialize (Serialize (..), getWord8, putWord8)
-import Data.String (IsString (..))
 import Data.Text (Text)
 import Data.Time.Calendar (toModifiedJulianDay)
 import Data.Time.Clock (NominalDiffTime, UTCTime (..), addUTCTime)
 import Data.Time.LocalTime (TimeZone, utcToLocalTime)
-import Text.Regex.TDFA (Regex, makeRegex, matchTest)
-import Witch
 
 import Data.HashSet qualified as HS
 import Data.IntMap qualified as IM
 import Data.Map qualified as M
 
 import Common
+import Common.Prelude hiding (put, get)
 import Domain.Error
 import Domain.Serialization.CerealOrphans ()
 import Domain.TaskId

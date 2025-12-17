@@ -1,7 +1,5 @@
 module View (initTaskDetailRenderConfig, sortTaskDetails) where
 
-import Data.Foldable (Foldable (..))
-import Data.Function ((&))
 import Data.List (sort, sortBy)
 import Data.Ord (Down (..), comparing)
 import Data.Time.Format.ISO8601 (iso8601Show)
@@ -10,7 +8,12 @@ import Witch
 
 import Data.Text qualified as T
 
-import Domain (TaskDetail (..), TaskDetailDeadline (..), TaskDetailStatus (..))
+import Common.Prelude
+import Domain
+    ( TaskDetail (..)
+    , TaskDetailDeadline (..)
+    , TaskDetailStatus (..)
+    )
 import Effect.Format
 
 data ColNameTaskDetail

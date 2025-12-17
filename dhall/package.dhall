@@ -96,6 +96,8 @@ let extRecords : List Text =
 
 let extGeneralSyntax : List Text =
     [ "ImportQualifiedPost"
+    , "NoImplicitPrelude"
+    , "PackageImports"
     , "BlockArguments"
     , "TupleSections"
     , "LambdaCase"

@@ -5,9 +5,7 @@ module Common.AbstractError
     , liftEitherAs
     ) where
 
-import Control.Monad.Except (MonadError (..))
-import Data.Bifunctor (first)
-import Witch
+import Common.Prelude
 
 throwErrorInto :: forall e t m a. (From t e, MonadError e m) => t -> m a
 throwErrorInto = throwError . into

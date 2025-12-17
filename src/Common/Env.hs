@@ -1,8 +1,9 @@
 module Common.Env (Env (..), MonadEnv) where
 
-import Control.Monad.Reader (MonadReader)
 import Data.Time.Clock (UTCTime)
 import Data.Time.LocalTime (TimeZone)
+
+import Common.Prelude
 
 data Env = Env
     { now :: !UTCTime

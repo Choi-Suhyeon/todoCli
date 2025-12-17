@@ -2,8 +2,7 @@
 
 module CliParser (module CliParser.Options, parseOpts) where
 
-import Control.Monad (mfilter)
-import Data.Bool (bool)
+
 import Data.ByteString (ByteString)
 import Data.FileEmbed (embedFile)
 import Data.HashSet (HashSet)
@@ -17,13 +16,13 @@ import Data.Time.Format.ISO8601
 import Data.Time.LocalTime (LocalTime (..), TimeOfDay (..))
 import Data.Version (showVersion)
 import Options.Applicative
-import Text.Regex.TDFA ((=~))
-import Witch
 
 import Data.HashSet qualified as HS
 import Data.Text qualified as T
 import Data.Text.Encoding qualified as TE
 
+import Common.Prelude
+import Common.Regex
 import CliParser.Options
 import Paths_todo (version)
 

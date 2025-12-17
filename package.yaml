@@ -49,6 +49,8 @@ executables:
       - RecordWildCards
       - NamedFieldPuns
       - ImportQualifiedPost
+      - NoImplicitPrelude
+      - PackageImports
       - BlockArguments
       - TupleSections
       - LambdaCase
@@ -103,6 +105,8 @@ library:
     - RecordWildCards
     - NamedFieldPuns
     - ImportQualifiedPost
+    - NoImplicitPrelude
+    - PackageImports
     - BlockArguments
     - TupleSections
     - LambdaCase

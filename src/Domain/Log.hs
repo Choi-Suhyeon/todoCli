@@ -1,20 +1,16 @@
 module Domain.Log (MonadLog, Log, logMsg, renderTaskDetail, renderTaskSummary) where
 
-import Control.Monad.Writer.Strict (MonadWriter, tell)
-import Data.Bool (bool)
-import Data.Function ((&))
 import Data.HashSet (HashSet)
-import Data.List (sort)
 import Data.Sequence (Seq)
 import Data.Text (Text)
 import Data.Time.Format.ISO8601 (iso8601Show)
 import Data.Time.LocalTime (TimeZone, utcToLocalTime)
-import Witch
 
 import Data.HashSet qualified as HS
 import Data.List qualified as L
 import Data.Text qualified as T
 
+import Common.Prelude
 import Domain.TodoRegistry
 
 type MonadLog m = MonadWriter Log m
@@ -47,6 +43,6 @@ renderTags delimRequired tags
     | HS.null tags = "N/A"
     | otherwise =
         HS.toList tags
-            & sort
+            & L.sort
             & T.intercalate " "
             & bool id (("(tags: " <>) . (<> ")")) delimRequired
