@@ -43,26 +43,26 @@ where
 
 import Data.Fixed (Pico)
 import Data.Function (on, (&))
-import Data.Generics.Labels ()
+import Data.Functor ((<&>))
 import Data.HashSet (HashSet)
 import Data.Hashable (Hashable (..))
 import Data.IntMap (IntMap)
 import Data.Map (Map)
 import Data.Maybe (fromMaybe)
-import Data.Serialize (Serialize (..))
+import Data.Serialize (Serialize (..), getWord8, putWord8)
 import Data.String (IsString (..))
 import Data.Text (Text)
 import Data.Time.Calendar (toModifiedJulianDay)
 import Data.Time.Clock (NominalDiffTime, UTCTime (..), addUTCTime)
 import Data.Time.LocalTime (TimeZone, utcToLocalTime)
-import GHC.Generics (Generic)
 import Text.Regex.TDFA (Regex, makeRegex, matchTest)
 import Witch
 
-import Data.HashSet qualified as S
+import Data.HashSet qualified as HS
 import Data.IntMap qualified as IM
 import Data.Map qualified as M
 
+import Common
 import Domain.Error
 import Domain.Serialization.CerealOrphans ()
 import Domain.TaskId
@@ -73,7 +73,16 @@ data TodoRegistry = TodoRegistry
     , tagToId :: !(Map Text (HashSet TaskId))
     , statusToId :: !(Map TaskStatus (HashSet TaskId))
     }
-    deriving (Generic, Show)
+    deriving (Show)
+
+instance Serialize TodoRegistry where
+    put TodoRegistry{..} = do
+        put ids
+        put idToTask
+        put tagToId
+        put statusToId
+
+    get = TodoRegistry <$> get <*> get <*> get <*> get
 
 data Task = Task
     { name :: !TaskName
@@ -82,32 +91,52 @@ data Task = Task
     , status :: !TaskStatus
     , deadline :: !TaskDeadline
     }
-    deriving (Generic, Show)
+    deriving (Show)
+
+instance Serialize Task where
+    put Task{..} = do
+        put name
+        put memo
+        put tags
+        put status
+        put deadline
+
+    get = Task <$> get <*> get <*> get <*> get <*> get
 
 newtype TaskName = TaskName {unTaskName :: Text}
-    deriving stock (Eq, Generic, Ord, Show)
-    deriving (Hashable, IsString) via Text
+    deriving stock (Eq, Ord, Show)
+    deriving (Hashable, IsString, Serialize) via Text
 
 instance From Text TaskName
 instance From TaskName Text
 
 newtype TaskMemo = TaskMemo {unTaskMemo :: Text}
-    deriving stock (Eq, Generic, Ord, Show)
-    deriving (Hashable, IsString) via Text
+    deriving stock (Eq, Ord, Show)
+    deriving (Hashable, IsString, Serialize) via Text
 
 instance From Text TaskMemo
 instance From TaskMemo Text
 
 data TaskStatus = Done | Undone
-    deriving (Eq, Generic, Ord, Show)
+    deriving (Eq, Ord, Show)
 
 instance Hashable TaskStatus where
     hashWithSalt s Done = s `hashWithSalt` (0 :: Int)
     hashWithSalt s Undone = s `hashWithSalt` (1 :: Int)
 
+instance Serialize TaskStatus where
+    put Undone = putWord8 0
+    put Done = putWord8 1
+
+    get =
+        getWord8 >>= \case
+            0 -> pure Undone
+            1 -> pure Done
+            _ -> fail "TaskStatus: invalid tag"
+
 newtype TaskTags = TaskTags {unTaskTags :: HashSet Text}
-    deriving stock (Eq, Generic, Ord, Show)
-    deriving (Hashable, Monoid, Semigroup) via (HashSet Text)
+    deriving stock (Eq, Ord, Show)
+    deriving (Hashable, Semigroup, Serialize) via (HashSet Text)
 
 instance From (HashSet Text) TaskTags
 instance From TaskTags (HashSet Text)
@@ -115,7 +144,7 @@ instance From TaskTags (HashSet Text)
 data TaskDeadline
     = Boundless
     | Bound UTCTime
-    deriving (Eq, Generic, Ord, Show)
+    deriving (Eq, Ord, Show)
 
 instance Hashable TaskDeadline where
     hashWithSalt salt Boundless =
@@ -126,13 +155,15 @@ instance Hashable TaskDeadline where
             `hashWithSalt` toModifiedJulianDay day
             `hashWithSalt` (truncate (diffTime * 1000000000) :: Integer)
 
-deriving anyclass instance Serialize TaskStatus
-deriving anyclass instance Serialize TaskDeadline
-deriving anyclass instance Serialize TaskTags
-deriving anyclass instance Serialize TaskName
-deriving anyclass instance Serialize TaskMemo
-deriving anyclass instance Serialize Task
-deriving anyclass instance Serialize TodoRegistry
+instance Serialize TaskDeadline where
+    put Boundless = putWord8 0
+    put (Bound utc) = putWord8 1 *> put utc
+
+    get =
+        getWord8 >>= \case
+            0 -> pure Boundless
+            1 -> Bound <$> get
+            _ -> fail "TaskDeadline: invalid tag"
 
 data EntryCreation = EntryCreation
     { name :: !Text
@@ -154,7 +185,7 @@ data EntryPatch = EntryPatch
 data EntryDeadline
     = EBoundless
     | EBound UTCTime
-    deriving (Generic, Show)
+    deriving (Show)
 
 instance From EntryDeadline TaskDeadline where
     from EBoundless = Boundless
@@ -226,16 +257,16 @@ initTodoRegistry = TodoRegistry initIds IM.empty M.empty M.empty
 isIdInUse :: TaskId -> TodoRegistry -> Bool
 isIdInUse tid TodoRegistry{idToTask} = IM.member (into tid) idToTask
 
-insertTask :: Task -> TodoRegistry -> TodoRegistry
+insertTask :: Task -> TodoRegistry -> Either DomainError TodoRegistry
 insertTask task@Task{..} TodoRegistry{..} =
-    TodoRegistry
-        { ids = ids'
-        , idToTask = IM.insert (into tid) task idToTask
-        , tagToId = insertIntoSetsAtKeysWith (<>) tid (into @(HashSet Text) tags) tagToId
-        , statusToId = insertIntoSetsAtKeysWith (<>) tid (Just status) statusToId
-        }
-  where
-    (ids', tid) = allocId ids
+    maybeToEither TaskIdExhausted
+        $ allocId ids <&> \(ids', tid) ->
+            TodoRegistry
+                { ids = ids'
+                , idToTask = IM.insert (into tid) task idToTask
+                , tagToId = insertIntoSetsAtKeysWith (<>) tid (into @(HashSet Text) tags) tagToId
+                , statusToId = insertIntoSetsAtKeysWith (<>) tid (Just status) statusToId
+                }
 
 replaceTask :: TaskId -> Task -> TodoRegistry -> TodoRegistry
 replaceTask tid newTask reg@TodoRegistry{..} = case getTaskById tid reg of
@@ -259,8 +290,8 @@ replaceTask tid newTask reg@TodoRegistry{..} = case getTaskById tid reg of
         | oldStatus == newStatus = statusToId
         | otherwise =
             statusToId
-                & M.map (S.delete tid)
-                & M.insertWith (<>) (into newStatus) (S.singleton tid)
+                & M.map (HS.delete tid)
+                & M.insertWith (<>) (into newStatus) (HS.singleton tid)
 
 deleteTask :: TaskId -> TodoRegistry -> TodoRegistry
 deleteTask tid reg@TodoRegistry{..}
@@ -354,10 +385,10 @@ getTasksByNameRegex pattern = getTasksMatching (\Task{name} -> matchTest compile
 
 getTasksWithAllTags :: HashSet Text -> TodoRegistry -> HashSet TaskId
 getTasksWithAllTags tags reg@TodoRegistry{tagToId}
-    | S.null tags = getAllTasks reg
+    | HS.null tags = getAllTasks reg
     | otherwise =
         tags
-            & S.map (\t -> M.findWithDefault S.empty t tagToId & Intersection)
+            & HS.map (\t -> M.findWithDefault HS.empty t tagToId & Intersection)
             & foldr1 (<>)
             & into
 
@@ -368,7 +399,7 @@ newtype Intersection a = Intersection {getIntersection :: HashSet a}
     deriving newtype (Hashable)
 
 instance (Eq a, Hashable a) => Semigroup (Intersection a) where
-    Intersection x <> Intersection y = Intersection (S.intersection x y)
+    Intersection x <> Intersection y = Intersection (HS.intersection x y)
 
 instance From (Intersection a) (HashSet a)
 
@@ -378,20 +409,20 @@ statusDueThreshold :: NominalDiffTime
 statusDueThreshold = from @Pico $ 48 * 3600
 
 getTasksMatching :: (Task -> Bool) -> TodoRegistry -> HashSet TaskId
-getTasksMatching p TodoRegistry{idToTask} = IM.foldrWithKey insertKeyWhen S.empty idToTask
+getTasksMatching p TodoRegistry{idToTask} = IM.foldrWithKey insertKeyWhen HS.empty idToTask
   where
     insertKeyWhen :: Int -> Task -> HashSet TaskId -> HashSet TaskId
     insertKeyWhen key task set
-        | p task = S.insert (into key) set
+        | p task = HS.insert (into key) set
         | otherwise = set
 
 getTasksByStatus :: TaskStatus -> TodoRegistry -> HashSet TaskId
-getTasksByStatus s TodoRegistry{statusToId} = M.findWithDefault S.empty s statusToId
+getTasksByStatus s TodoRegistry{statusToId} = M.findWithDefault HS.empty s statusToId
 
 getTasksUndoneAnd :: (UTCTime -> Bool) -> TodoRegistry -> HashSet TaskId
 getTasksUndoneAnd p reg@TodoRegistry{idToTask} =
     getUndoneTasks reg
-        & S.filter (predicate . (idToTask IM.!?) . into)
+        & HS.filter (predicate . (idToTask IM.!?) . into)
   where
     predicate :: Maybe Task -> Bool
     predicate (Just Task{deadline = Bound x}) = p x
@@ -417,7 +448,7 @@ validateDeadline tz now dd
 deleteFromSetsAtKeys
     :: (Foldable t, Hashable a, Ord k)
     => a -> t k -> Map k (HashSet a) -> Map k (HashSet a)
-deleteFromSetsAtKeys = flip . foldr . M.adjust . S.delete
+deleteFromSetsAtKeys = flip . foldr . M.adjust . HS.delete
 
 insertIntoSetsAtKeysWith
     :: (Foldable t, Hashable a, Ord k)
@@ -426,4 +457,4 @@ insertIntoSetsAtKeysWith
     -> t k
     -> Map k (HashSet a)
     -> Map k (HashSet a)
-insertIntoSetsAtKeysWith f val ks m = foldr (\k -> M.insertWith f k (S.singleton val)) m ks
+insertIntoSetsAtKeysWith f val ks m = foldr (\k -> M.insertWith f k (HS.singleton val)) m ks

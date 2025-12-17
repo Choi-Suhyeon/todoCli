@@ -6,8 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
-### Add
+### Added
 - Added Dhall configuration files (`package.dhall`, `stack.dhall`, `hie.dhall`, `fourmolu.dhall`) to minimize repetition and cognitive overhead in YAML configs.
+
+### Changed
+- Replaced Generic-derived instances with manual implementations for Serialize and Hashable
+- Removed lens dependency
+
+### Fixed
+- Strengthened edge case verification for TaskId
 
 ## [2.0.0] - 2025-12-10
 

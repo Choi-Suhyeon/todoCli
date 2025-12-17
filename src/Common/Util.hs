@@ -1,4 +1,4 @@
-module Common.Util (tee, teeM, (>!), (.:), weave) where
+module Common.Util (tee, teeM, (>!), (.:), weave, maybeToEither) where
 
 infixl 1 >!
 infixr 9 .:
@@ -17,3 +17,7 @@ f .: g = (f .) . g
 
 weave :: (Functor f1, Functor f2) => f1 (a -> b) -> f2 a -> f1 (f2 b)
 weave fs xs = (<$> xs) <$> fs
+
+maybeToEither :: a -> Maybe b -> Either a b
+maybeToEither _ (Just b) = Right b
+maybeToEither a Nothing = Left a

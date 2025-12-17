@@ -20,7 +20,7 @@ import Options.Applicative
 import Text.Regex.TDFA ((=~))
 import Witch
 
-import Data.HashSet qualified as S
+import Data.HashSet qualified as HS
 import Data.Text qualified as T
 import Data.Text.Encoding qualified as TE
 
@@ -133,7 +133,7 @@ pAddCommand = AddCommand <$> pName <*> pDeadline <*> pMemo <*> pTags
                 <> long "tags"
                 <> metavar "TAGS"
                 <> help "Space-separated tags (maximum 10)"
-                <> value S.empty
+                <> value HS.empty
 
 pListCommand :: Parser ListCommand
 pListCommand = ListCommand <$> pTags <*> pStatus
@@ -145,7 +145,7 @@ pListCommand = ListCommand <$> pTags <*> pStatus
                 <> long "tags"
                 <> metavar "TAGS"
                 <> help "Filter by tags (space-separated)"
-                <> value S.empty
+                <> value HS.empty
 
     pStatus :: Parser (Maybe ListStatus)
     pStatus =
@@ -299,4 +299,4 @@ textSetReader =
     isValidSetLen = liftA2 (&&) (> 0) (<= 4) . length
 
     uniqueWords :: Text -> HashSet Text
-    uniqueWords = S.filter (not . T.null) . S.fromList . T.splitOn " "
+    uniqueWords = HS.filter (not . T.null) . HS.fromList . T.splitOn " "

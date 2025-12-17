@@ -2,6 +2,7 @@ module Domain.Log (MonadLog, Log, logMsg, renderTaskDetail, renderTaskSummary) w
 
 import Control.Monad.Writer.Strict (MonadWriter, tell)
 import Data.Bool (bool)
+import Data.Function ((&))
 import Data.HashSet (HashSet)
 import Data.List (sort)
 import Data.Sequence (Seq)
@@ -10,11 +11,10 @@ import Data.Time.Format.ISO8601 (iso8601Show)
 import Data.Time.LocalTime (TimeZone, utcToLocalTime)
 import Witch
 
-import Data.HashSet qualified as S
+import Data.HashSet qualified as HS
 import Data.List qualified as L
 import Data.Text qualified as T
 
-import Common
 import Domain.TodoRegistry
 
 type MonadLog m = MonadWriter Log m
@@ -36,7 +36,7 @@ renderTaskDetail tz TaskDetail{name, status, deadline, tags, memo} =
 
 renderTaskSummary :: TaskDetail -> Text
 renderTaskSummary TaskDetail{name, status, tags} =
-    T.concat [into $ show status, " task '", name, "' ", renderTags True tags]
+    mconcat [into $ show status, " task '", name, "' ", renderTags True tags]
 
 renderDeadline :: TimeZone -> TaskDetailDeadline -> Text
 renderDeadline _ DBoundless = "N/A"
@@ -44,9 +44,9 @@ renderDeadline tz (DBound d) = utcToLocalTime tz d & iso8601Show & T.pack
 
 renderTags :: Bool -> HashSet Text -> Text
 renderTags delimRequired tags
-    | S.null tags = "N/A"
+    | HS.null tags = "N/A"
     | otherwise =
-        S.toList tags
+        HS.toList tags
             & sort
             & T.intercalate " "
             & bool id (("(tags: " <>) . (<> ")")) delimRequired

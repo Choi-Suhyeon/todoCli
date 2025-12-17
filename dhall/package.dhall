@@ -15,14 +15,14 @@ let extraSourceFiles : List Text =
     , "CHANGELOG.md"
     , "ROADMAP.md"
     , "docs/long-help.md"
-    ] 
+    ]
 
-let dataFiles : List Text = 
+let dataFiles : List Text =
     [ "docs/long-help.txt"
     , "docs/todo.1"
     ]
 
-let commonGhcOptions : List Text = 
+let commonGhcOptions : List Text =
     [ "-Wall"
     , "-Wcompat"
     , "-Widentities"
@@ -48,9 +48,7 @@ let dependencies : List Text =
     , "directory"
     , "file-embed"
     , "filepath"
-    , "generic-lens"
     , "hashable"
-    , "microlens"
     , "mtl"
     , "optparse-applicative"
     , "regex-tdfa"
@@ -103,16 +101,17 @@ let extGeneralSyntax : List Text =
     , "LambdaCase"
     , "MultiWayIf"
     , "BangPatterns"
+    , "NumericUnderscores"
     ]
 
-let defaultExtensions : List Text 
+let defaultExtensions : List Text
     = extTypeSystem
     # extDeriving
     # extOverloading
     # extRecords
     # extGeneralSyntax
 
-in 
+in
     { name = libName
     , version = version
     , github = githubRepo
@@ -129,7 +128,7 @@ in
         { source-dirs = "src"
         , default-extensions = defaultExtensions
         }
-    , executables = 
+    , executables =
         { todo =
             { main = "Main.hs"
             , source-dirs = "app"
@@ -139,7 +138,7 @@ in
             }
         }
     {--
-    , tests = 
+    , tests =
         { main = "todo-test"
         , source-dirs = "test"
         , ghc-options = ghcOptions

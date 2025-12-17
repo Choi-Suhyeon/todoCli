@@ -35,7 +35,6 @@ library
       Common
       Common.AbstractError
       Common.Env
-      Common.Optics
       Common.Util
       Domain
       Domain.Error
@@ -84,6 +83,7 @@ library
       LambdaCase
       MultiWayIf
       BangPatterns
+      NumericUnderscores
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wredundant-constraints
   build-depends:
       base
@@ -94,9 +94,7 @@ library
     , directory
     , file-embed
     , filepath
-    , generic-lens
     , hashable
-    , microlens
     , mtl
     , optparse-applicative
     , regex-tdfa
@@ -145,6 +143,7 @@ executable todo
       LambdaCase
       MultiWayIf
       BangPatterns
+      NumericUnderscores
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base
@@ -155,9 +154,7 @@ executable todo
     , directory
     , file-embed
     , filepath
-    , generic-lens
     , hashable
-    , microlens
     , mtl
     , optparse-applicative
     , regex-tdfa

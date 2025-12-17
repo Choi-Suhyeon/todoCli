@@ -29,15 +29,16 @@ module Domain
 
 import Control.Monad (when)
 import Control.Monad.Reader (ask)
-import Control.Monad.State.Strict (MonadState (..), modify')
+import Control.Monad.State.Strict (MonadState (..))
 import Data.Either (fromRight)
 import Data.Foldable (for_)
+import Data.Function ((&))
 import Data.HashSet (HashSet)
 import Data.Maybe (fromJust, isJust, mapMaybe)
 import Data.Text (Text)
 import Witch
 
-import Data.HashSet qualified as S
+import Data.HashSet qualified as HS
 import Data.Text qualified as T
 
 import Common
@@ -65,10 +66,12 @@ addTask
     :: (MonadDomainError e m, MonadEnv m, MonadLog m, MonadRegistry m)
     => EntryCreation -> m ()
 addTask e = do
+    reg <- get
     Env{tz, now} <- ask
     newTask <- liftEitherInto $ TR.mkTask tz now e
+    reg' <- liftEitherInto $ TR.insertTask newTask reg
 
-    modify' $ TR.insertTask newTask
+    put reg'
     logMsg $ "task added:\n" <> renderTaskDetail tz (TR.toTaskDetail now newTask)
 
 editTask
@@ -133,7 +136,7 @@ deleteTasks taskIds = do
                 . fromJust
             )
             . (`TR.getTaskById` reg)
-    put $ S.foldl' (flip TR.deleteTask) reg taskIds
+    put $ HS.foldl' (flip TR.deleteTask) reg taskIds
 
 getTaskDetails
     :: (MonadEnv m, MonadRegistry m) => HashSet TaskId -> m [TaskDetail]
@@ -142,7 +145,7 @@ getTaskDetails tids = do
     reg <- get
 
     tids
-        & S.toList
+        & HS.toList
         & mapMaybe ((TR.toTaskDetail now <$>) . (`TR.getTaskById` reg))
         & pure
 
@@ -166,7 +169,3 @@ getTasksByNameRegex pattern = get >>= pure . TR.getTasksByNameRegex pattern
 
 getTasksWithAllTags :: (MonadRegistry m) => HashSet Text -> m (HashSet TaskId)
 getTasksWithAllTags tags = get >>= pure . TR.getTasksWithAllTags tags
-
-maybeToEither :: a -> Maybe b -> Either a b
-maybeToEither _ (Just b) = Right b
-maybeToEither a Nothing = Left a

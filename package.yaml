@@ -12,9 +12,7 @@ dependencies:
   - directory
   - file-embed
   - filepath
-  - generic-lens
   - hashable
-  - microlens
   - mtl
   - optparse-applicative
   - regex-tdfa
@@ -56,6 +54,7 @@ executables:
       - LambdaCase
       - MultiWayIf
       - BangPatterns
+      - NumericUnderscores
     dependencies:
       - todo
     ghc-options:
@@ -109,6 +108,7 @@ library:
     - LambdaCase
     - MultiWayIf
     - BangPatterns
+    - NumericUnderscores
   source-dirs: src
 license: BSD-3-Clause
 maintainer: "SUHYEON CHOI (1AzyF0x) <1AzyF0x@protonmail.ch>"

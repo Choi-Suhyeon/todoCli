@@ -43,19 +43,13 @@ $(OUTPUT_TXT): $(INPUT_MD)
 $(OUTPUT_MAN): $(INPUT_MD)
 	pandoc -s -t man $< -o $@
 
-$(OUTPUT_TXT): $(INPUT_MD)
-	pandoc -s -t plain $< -o $@
-
-$(OUTPUT_MAN): $(INPUT_MD)
-	pandoc -s -t man $< -o $@
-
 .PHONY: install
 install: $(OUTPUT_MAN)
 	@SYSTEM_NAME=$$(uname); \
 	if [ "$$SYSTEM_NAME" = "Linux" ] || [ "$$SYSTEM_NAME" = "Darwin" ]; then \
 		MAN_INSTALL_DIR=/usr/local/share/man/man1; \
 		sudo mkdir -p $$MAN_INSTALL_DIR; \
-		sudo install -m 0644 $< $$MAN_INSTALL_DIR/todo.1; \
+		sudo install -m 0644 $< $$MAN_INSTALL_DIR/$$(basename $<); \
     fi
 
 .PHONY: clean

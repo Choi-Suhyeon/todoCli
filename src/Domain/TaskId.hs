@@ -6,62 +6,80 @@ module Domain.TaskId
     , releaseId
     ) where
 
-import Data.Bifunctor (bimap)
-import Data.Generics.Labels ()
+import Control.Monad (unless)
+import Data.Bifunctor (first)
 import Data.Hashable (Hashable)
+import Data.Int (Int64)
 import Data.IntSet (IntSet)
-import Data.Serialize (Serialize)
-import Data.Tuple (swap)
+import Data.Serialize (Get, Serialize (..))
 import Witch
 
 import Data.IntSet qualified as IS
 
-import Common.Optics
-
 newtype TaskId = TaskId {unTaskId :: Int}
-    deriving stock (Eq, Generic, Ord, Show)
-    deriving newtype (Hashable)
+    deriving stock (Eq, Ord, Show)
+    deriving newtype (Enum, Hashable)
 
 instance From Int TaskId
-
 instance From TaskId Int
 
-minTaskId :: TaskId
-minTaskId = TaskId 1
+instance TryFrom Int64 TaskId where
+    tryFrom =
+        fmap (into @TaskId)
+            . first (\(TryFromException src e) -> TryFromException src e)
+            . tryInto @Int
+
+instance Bounded TaskId where
+    minBound = TaskId 1
+    maxBound = TaskId maxBound
+
+instance Serialize TaskId where
+    put tid = put $ via @Int @_ @Int64 tid
+    get = do
+        tid <- either (const $ failed) pure . tryInto @TaskId =<< get @Int64
+
+        unless (tid >= minBound) failed
+        pure tid
+      where
+        failed :: Get a
+        failed = fail "TaskId: invalid id"
 
 data Ids = Ids
     { next :: !TaskId
     , released :: !IntSet
     }
-    deriving (Generic, Show)
+    deriving (Show)
+
+instance Serialize Ids where
+    put Ids{..} = put next *> put released
+    get = liftA2 Ids get get
 
 initIds :: Ids
-initIds = Ids minTaskId IS.empty
+initIds = Ids minBound IS.empty
 
-allocId :: Ids -> (Ids, TaskId)
+allocId :: Ids -> Maybe (Ids, TaskId)
 allocId ids
-    | IS.null ids.released =
-        (ids & #next . #unTaskId %~ succ, ids.next)
+    | not $ IS.null ids.released =
+        let
+            (i, rel') = IS.deleteFindMin ids.released
+         in
+            Just (ids{released = rel'}, TaskId i)
+    | let
+        tid = ids.next
+    , tid < maxBound =
+        Just (ids{next = succ tid}, tid)
     | otherwise =
-        ids.released
-            & IS.deleteFindMin
-            & swap
-            & bimap (($ ids) . (#released .~)) TaskId
+        Nothing
 
 releaseId :: TaskId -> Ids -> Ids
 releaseId tid ids
-    | isValidId =
-        if
-            | isDoubleFreed -> ids
-            | isMaxId -> ids & #next . #unTaskId %~ pred
-            | otherwise -> ids & #released %~ IS.insert tid.unTaskId
-    | otherwise = ids
+    | not isValidId = ids
+    | isDoubleFreed = ids
+    | isMaxId = ids{next = pred ids.next}
+    | otherwise = ids{released = IS.insert (into tid) ids.released}
   where
     isValidId, isMaxId, isDoubleFreed :: Bool
 
-    isValidId = liftA2 (&&) (>= minTaskId) (< ids.next) tid
-    isMaxId = (tid & #unTaskId %~ succ) == ids.next
+    isValidId = minBound <= tid && tid < ids.next
+    isMaxId = ids.next > minBound && succ tid == ids.next
     isDoubleFreed = tid.unTaskId `IS.member` ids.released
-
-deriving anyclass instance Serialize Ids
-deriving newtype instance Serialize TaskId
