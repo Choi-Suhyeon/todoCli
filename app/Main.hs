@@ -16,6 +16,12 @@ import CliParser
 import Common
 import Common.Prelude
 import Domain
+import Domain.Core
+    ( checkIdInvariant
+    , checkStatusIndexInvariant
+    , checkTagIndexInvariant
+    , rebuildIds
+    )
 import Domain.Serialization
 import Effect
 import View
@@ -75,7 +81,11 @@ main = do
     (intermediate, logs) <- main' opts & runApp env reg
     result <-
         runExceptT
-            $ ExceptT (pure intermediate) >>= writeData . serialize . UsingCereal . snd
+            $ ExceptT (pure intermediate)
+            >>= writeData
+            . serialize
+            . UsingCereal
+            . snd
 
     let
         printLogsEndedWith :: Maybe Text -> IO ()
@@ -101,7 +111,18 @@ main = do
                     & deserialize @(UsingCereal TodoRegistry)
                     & liftEitherInto @AppError
 
-            pure reg
+            let
+                adjust =
+                    bool rebuildIds pure
+                        $ and
+                        $ map
+                            ($ reg)
+                            [ checkIdInvariant
+                            , checkTagIndexInvariant
+                            , checkStatusIndexInvariant
+                            ]
+
+            liftEitherInto $ adjust reg
 
 main' :: Options -> App ()
 main' Options{optCommand, verbose} = censor (bool (const mempty) id verbose) $ runCommand optCommand

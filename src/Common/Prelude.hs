@@ -23,9 +23,8 @@ module Common.Prelude
     , tee
     , teeM
     , (>!)
+    , (.:)
     ) where
-
-import "base" Prelude hiding (unzip)
 
 import Control.Applicative
 import Control.Monad
@@ -46,8 +45,10 @@ import Data.Semigroup hiding (First (..), Last (..))
 import Data.String
 import Data.Traversable
 import Witch
+import "base" Prelude hiding (unzip)
 
 infixl 1 >!
+infixr 9 .:
 
 maybeToEither :: a -> Maybe b -> Either a b
 maybeToEither _ (Just b) = Right b
@@ -61,3 +62,6 @@ teeM = (=<<) . tee
 
 (>!) :: (Monad m) => m a -> (a -> m b) -> m a
 (>!) = flip teeM
+
+(.:) :: (c -> d) -> (a -> b -> c) -> a -> b -> d
+f .: g = (f .) . g

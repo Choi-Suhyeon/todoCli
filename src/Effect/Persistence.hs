@@ -20,7 +20,8 @@ import Effect.Error
 readData :: (MonadEffectError e m, MonadIO m) => m ByteString
 readData =
     getDataDirectory
-        >>= (liftSafeIO @IOException . readFile) . (</> dataFileName)
+        >>= (liftSafeIO @IOException . readFile)
+        . (</> dataFileName)
         >>= liftEitherAs ReadFailed
 
 writeData :: (MonadEffectError e m, MonadIO m) => ByteString -> m ()

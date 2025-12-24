@@ -11,7 +11,7 @@ import Data.List qualified as L
 import Data.Text qualified as T
 
 import Common.Prelude
-import Domain.TodoRegistry
+import Domain.Core
 
 type MonadLog m = MonadWriter Log m
 

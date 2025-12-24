@@ -1,21 +1,19 @@
-module Domain.TaskId
+module Domain.Core.TaskId.Internal
     ( TaskId (..)
-    , Ids
+    , Ids (..)
     , initIds
     , allocId
     , releaseId
     ) where
 
-import Prelude
-import Control.Monad (unless)
-import Data.Bifunctor (first)
 import Data.Hashable (Hashable)
 import Data.Int (Int64)
 import Data.IntSet (IntSet)
 import Data.Serialize (Get, Serialize (..))
-import Witch
 
 import Data.IntSet qualified as IS
+
+import Common.Prelude hiding (get, put)
 
 newtype TaskId = TaskId {unTaskId :: Int}
     deriving stock (Eq, Ord, Show)

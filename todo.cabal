@@ -37,14 +37,20 @@ library
       Common.Env
       Common.Prelude
       Common.Regex
-      Common.Util
       Domain
+      Domain.Core
+      Domain.Core.Internal
+      Domain.Core.Invariants
+      Domain.Core.Task
+      Domain.Core.Task.Internal
+      Domain.Core.TaskId
+      Domain.Core.TaskId.Internal
+      Domain.Core.TodoRegistry
+      Domain.Core.TodoRegistry.Internal
       Domain.Error
       Domain.Log
       Domain.Serialization
       Domain.Serialization.CerealOrphans
-      Domain.TaskId
-      Domain.TodoRegistry
       Effect
       Effect.Error
       Effect.Format

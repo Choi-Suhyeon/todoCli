@@ -73,7 +73,7 @@ sortTaskDetails :: [TaskDetail] -> [TaskDetail]
 sortTaskDetails =
     sortBy
         $ comparing (\t -> t.status)
-            <> comparing (Down . (\t -> t.deadline))
-            <> comparing (length . (\t -> t.tags))
-            <> comparing (T.length . (\t -> t.name))
-            <> comparing (T.length . (\t -> t.memo))
+        <> comparing (Down . (\t -> t.deadline))
+        <> comparing (length . (\t -> t.tags))
+        <> comparing (T.length . (\t -> t.name))
+        <> comparing (T.length . (\t -> t.memo))

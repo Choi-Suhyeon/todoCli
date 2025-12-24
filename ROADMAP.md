@@ -17,8 +17,3 @@
 - Add an importance property to tasks to represent priority independent of deadlines.
 - Support importance values from `0` (default) to `9` (highest).
 - Add aliases for common importance levels.
-
-## Milestone 3: Adding Data Validation and Recovery
-
-- Add validation logic for persistent data correctness.
-- Implement recovery mechanisms when validation fails.

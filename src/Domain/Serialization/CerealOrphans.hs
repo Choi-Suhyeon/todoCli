@@ -14,7 +14,7 @@ import Data.Time.Clock (DiffTime, UTCTime (..))
 import Data.HashSet qualified as HS
 import Data.Text qualified as T
 
-import Common.Prelude hiding (put, get)
+import Common.Prelude hiding (get, put)
 
 instance Serialize Text where
     put = put . T.unpack
