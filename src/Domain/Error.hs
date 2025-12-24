@@ -11,14 +11,12 @@ type MonadDomainError e m = (MonadError e m, From DomainError e)
 data DomainError
     = EmptyTitle
     | TaskNotFound
-    | DeserializationFailed String
     | InvalidDeadline LocalTime LocalTime
     | TaskIdExhausted
 
 instance Show DomainError where
     show EmptyTitle = "Title must not be empty"
     show TaskNotFound = "The specified task could not be found"
-    show (DeserializationFailed s) = "Deserialization failed: " <> s
     show (InvalidDeadline c v) =
         printf
             "Deadline must be in the future (current: %s, input: %s)"

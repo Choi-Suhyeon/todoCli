@@ -37,6 +37,8 @@ library
       Common.Env
       Common.Prelude
       Common.Regex
+      Common.Serialization
+      Common.Serialization.CerealOrphans
       Domain
       Domain.Core
       Domain.Core.Internal
@@ -49,8 +51,6 @@ library
       Domain.Core.TodoRegistry.Internal
       Domain.Error
       Domain.Log
-      Domain.Serialization
-      Domain.Serialization.CerealOrphans
       Effect
       Effect.Error
       Effect.Format

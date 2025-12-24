@@ -22,7 +22,6 @@ import Domain.Core
     , checkTagIndexInvariant
     , rebuildIds
     )
-import Domain.Serialization
 import Effect
 import View
 
@@ -49,6 +48,7 @@ data AppError
     = DomainE DomainError
     | EffectE EffectError
     | ParserE ParserError
+    | StorageE StorageError
 
 data ParserError
     = MultipleTargetsError
@@ -62,10 +62,20 @@ instance Show ParserError where
     show DeletionTargetNotFound = "No target matches the deletion criteria"
     show NoOptionsProvided = "At least one option is required"
 
+data StorageError = SerializationE String
+    deriving (Show)
+
+instance From SerializationError StorageError where
+    from (DeserializationFailed e) = SerializationE e
+
+instance From StorageError AppError where
+    from = StorageE
+
 instance Show AppError where
     show (DomainE x) = "[E:Logic] " <> show x
     show (EffectE x) = "[E:System] " <> show x
     show (ParserE x) = "[E:Parser] " <> show x
+    show (StorageE x) = "[E:Storage] " <> show x
 
 instance From DomainError AppError where
     from = DomainE
@@ -109,6 +119,7 @@ main = do
             UsingCereal reg <-
                 raw
                     & deserialize @(UsingCereal TodoRegistry)
+                    & first (into @StorageError)
                     & liftEitherInto @AppError
 
             let

@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -Wno-orphans #-}
 
-module Domain.Serialization.CerealOrphans () where
+module Common.Serialization.CerealOrphans () where
 
 import Data.Fixed (Pico)
 import Data.HashSet (HashSet)

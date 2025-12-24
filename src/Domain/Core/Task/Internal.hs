@@ -15,7 +15,7 @@ import Data.Time.Calendar (toModifiedJulianDay)
 import Data.Time.Clock (UTCTime (..))
 
 import Common.Prelude hiding (get, put)
-import Domain.Serialization.CerealOrphans ()
+import Common.Serialization.CerealOrphans ()
 
 data Task = Task
     { name :: !TaskName

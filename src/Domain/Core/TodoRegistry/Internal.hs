@@ -40,7 +40,7 @@ import Domain.Core.Task
 import Domain.Core.Task.Internal (Task, TaskStatus)
 import Domain.Core.TaskId
 import Domain.Error
-import Domain.Serialization.CerealOrphans ()
+import Common.Serialization.CerealOrphans ()
 
 data TodoRegistry = TodoRegistry
     { ids :: !Ids
