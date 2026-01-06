@@ -13,20 +13,19 @@ module CliParser.Options
     , DeleteStatus (..)
     ) where
 
-import Data.Char (isSpace)
 import Data.HashSet (HashSet)
 import Data.Text (Text)
 import Data.Time.LocalTime (LocalTime)
 
 import Data.Text qualified as T
 
-import Common
+import Common.Prelude
 
 data Options = Options
     { optCommand :: Command
     , verbose :: Bool
     }
-    deriving (Generic, Show)
+    deriving (Show)
 
 data Command
     = Add AddCommand
@@ -34,7 +33,7 @@ data Command
     | Edit EditCommand
     | Mark MarkCommand
     | Delete DeleteCommand
-    deriving (Generic, Show)
+    deriving (Show)
 
 data AddCommand = AddCommand
     { name :: Text
@@ -42,16 +41,16 @@ data AddCommand = AddCommand
     , memo :: Text
     , tags :: HashSet Text
     }
-    deriving (Generic, Show)
+    deriving (Show)
 
 data OptionDeadline = Boundless | Bound LocalTime
-    deriving (Generic, Show)
+    deriving (Show)
 
 data ListCommand = ListCommand
     { tags :: HashSet Text
     , status :: Maybe ListStatus
     }
-    deriving (Generic, Show)
+    deriving (Show)
 
 data EditCommand = EditCommand
     { tgtName :: Text
@@ -60,16 +59,16 @@ data EditCommand = EditCommand
     , tags :: Maybe EditTags
     , deadline :: Maybe OptionDeadline
     }
-    deriving (Generic, Show)
+    deriving (Show)
 
 data EditTags = Clear | Substitute (HashSet Text)
-    deriving (Generic, Show)
+    deriving (Show)
 
 data EditMemo = Remove | Memo Text
-    deriving (Generic, Show)
+    deriving (Show)
 
 data MarkCommand = MrkDone Text | MrkUndone Text
-    deriving (Generic, Show)
+    deriving (Show)
 
 data DeleteCommand
     = DelAll
@@ -78,10 +77,10 @@ data DeleteCommand
         , byTags :: Maybe (HashSet Text)
         , byStatus :: Maybe DeleteStatus
         }
-    deriving (Generic, Show)
+    deriving (Show)
 
 data ListStatus = LstDone | LstUndone | LstDue | LstOverdue
-    deriving (Generic, Show)
+    deriving (Show)
 
 instance Read ListStatus where
     readsPrec _ str = case T.toUpper tgt of
@@ -97,7 +96,7 @@ instance Read ListStatus where
 data DeleteStatus
     = DelDone
     | DelOverdue
-    deriving (Generic, Show)
+    deriving (Show)
 
 instance Read DeleteStatus where
     readsPrec _ str = case T.toUpper tgt of

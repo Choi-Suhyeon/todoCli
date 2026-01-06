@@ -3,39 +3,31 @@
 module Main (main) where
 
 import Control.Exception (ErrorCall, evaluate, try)
-import Control.Monad ((>=>))
-import Control.Monad.Except (ExceptT (..), MonadError, runExceptT, throwError)
-import Control.Monad.IO.Class (MonadIO (..))
-import Control.Monad.Reader (MonadReader, ReaderT, ask, runReaderT)
-import Control.Monad.State.Strict (MonadState, StateT, runStateT)
-import Control.Monad.Writer.Strict (MonadWriter, WriterT, censor, runWriterT)
-import Data.Bool (bool)
-import Data.Either (fromRight)
-import Data.Foldable (Foldable (..), foldr1)
-import Data.Maybe (catMaybes, maybeToList)
 import Data.Text (Text)
 import Data.Time.Clock (getCurrentTime)
 import Data.Time.LocalTime (getCurrentTimeZone, localTimeToUTC)
 import System.Exit (exitFailure, exitSuccess)
-import Witch
-import Prelude hiding (Foldable (..))
+import System.IO (stderr)
 
-import Data.HashSet qualified as S
+import Data.HashSet qualified as HS
 import Data.Text.IO qualified as TIO
 
 import CliParser
 import Common
+import Common.Prelude
 import Domain
-import Domain.Serialization
+import Domain.Core
+    ( checkIdInvariant
+    , checkStatusIndexInvariant
+    , checkTagIndexInvariant
+    , rebuildIds
+    )
 import Effect
 import View
 
 newtype App a = App
     { unApp :: ReaderT Env (StateT TodoRegistry (ExceptT AppError (WriterT Log IO))) a
     }
-    deriving stock
-        ( Generic
-        )
     deriving newtype
         ( Applicative
         , Functor
@@ -50,13 +42,13 @@ newtype App a = App
 runApp
     :: Env -> TodoRegistry -> App a -> IO (Either AppError (a, TodoRegistry), Log)
 runApp env reg =
-    runWriterT . runExceptT . flip runStateT reg . flip runReaderT env . (^. #unApp)
+    runWriterT . runExceptT . flip runStateT reg . flip runReaderT env . (.unApp)
 
 data AppError
     = DomainE DomainError
     | EffectE EffectError
     | ParserE ParserError
-    deriving (Generic)
+    | StorageE StorageError
 
 data ParserError
     = MultipleTargetsError
@@ -70,10 +62,20 @@ instance Show ParserError where
     show DeletionTargetNotFound = "No target matches the deletion criteria"
     show NoOptionsProvided = "At least one option is required"
 
+data StorageError = SerializationE String
+    deriving (Show)
+
+instance From SerializationError StorageError where
+    from (DeserializationFailed e) = SerializationE e
+
+instance From StorageError AppError where
+    from = StorageE
+
 instance Show AppError where
     show (DomainE x) = "[E:Logic] " <> show x
     show (EffectE x) = "[E:System] " <> show x
     show (ParserE x) = "[E:Parser] " <> show x
+    show (StorageE x) = "[E:Storage] " <> show x
 
 instance From DomainError AppError where
     from = DomainE
@@ -89,11 +91,15 @@ main = do
     (intermediate, logs) <- main' opts & runApp env reg
     result <-
         runExceptT
-            (ExceptT (pure intermediate) >>= writeData . serialize . UsingCereal . snd)
+            $ ExceptT (pure intermediate)
+            >>= writeData
+            . serialize
+            . UsingCereal
+            . snd
 
     let
         printLogsEndedWith :: Maybe Text -> IO ()
-        printLogsEndedWith = TIO.putStr . foldMap id . (logs <>) . into . maybeToList
+        printLogsEndedWith = TIO.hPutStr stderr . foldMap id . (logs <>) . into . maybeToList
 
     case result of
         Right () -> printLogsEndedWith Nothing *> exitSuccess
@@ -113,9 +119,21 @@ main = do
             UsingCereal reg <-
                 raw
                     & deserialize @(UsingCereal TodoRegistry)
+                    & first (into @StorageError)
                     & liftEitherInto @AppError
 
-            pure reg
+            let
+                adjust =
+                    bool rebuildIds pure
+                        $ and
+                        $ map
+                            ($ reg)
+                            [ checkIdInvariant
+                            , checkTagIndexInvariant
+                            , checkStatusIndexInvariant
+                            ]
+
+            liftEitherInto $ adjust reg
 
 main' :: Options -> App ()
 main' Options{optCommand, verbose} = censor (bool (const mempty) id verbose) $ runCommand optCommand
@@ -133,7 +151,7 @@ runAddCommand AddCommand{name, deadline, memo, tags} = do
 
 runListCommand :: ListCommand -> App ()
 runListCommand ListCommand{tags, status} = do
-    Env{tz} <- ask
+    tz <- asks (.tz)
     tasks' <- getTasksWithAllTags tags
     tasks'' <- case status of
         Nothing -> getAllTasks
@@ -144,7 +162,7 @@ runListCommand ListCommand{tags, status} = do
             LstOverdue -> getOverdueTasks
 
     snapshots <-
-        S.intersection tasks' tasks''
+        HS.intersection tasks' tasks''
             & getTaskDetails
             & fmap sortTaskDetails
 
@@ -189,7 +207,7 @@ runDeleteCommand DelBy{byName, byTags, byStatus} = do
     tasks <-
         [tasks', tasks'', tasks''']
             & catMaybes
-            & foldr1 S.intersection
+            & foldr1 HS.intersection
             & evaluate
             & try @ErrorCall
             & liftIO
@@ -209,7 +227,7 @@ getFromSingleton = (. toList) \case
     [] -> throwError $ ParserE TargetNotFoundError
     _ -> throwError $ ParserE MultipleTargetsError
 
-
-optionDeadlineToEntryDeadline :: (MonadEnv m) => OptionDeadline -> m EntryDeadline
+optionDeadlineToEntryDeadline
+    :: (MonadEnv m) => OptionDeadline -> m EntryDeadline
 optionDeadlineToEntryDeadline Boundless = pure EBoundless
-optionDeadlineToEntryDeadline (Bound d) = ask >>= \Env{tz} -> pure $ EBound $ localTimeToUTC tz d
+optionDeadlineToEntryDeadline (Bound d) = asks (.tz) >>= pure . EBound . (`localTimeToUTC` d)

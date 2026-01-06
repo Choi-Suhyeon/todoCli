@@ -1,139 +1,120 @@
-name: todo
-version: 2.0.0
-github: "githubuser/todoCli"
-license: BSD-3-Clause
-author: "SUHYEON CHOI"
-maintainer: "1AzyF0x@protonmail.ch"
-copyright: "2025 1AzyF0x(SUHYEON CHOI)"
-
-extra-source-files:
-  - README.md
-  - CHANGELOG.md
-
+author: SUHYEON CHOI
+copyright: "2025 SUHYEON CHOI (1AzyF0x)"
 data-files:
   - docs/long-help.txt
   - docs/todo.1
-
-# Metadata used when publishing your package
-# synopsis:            Short description of your package
-# category:            Web
-
-# To avoid duplicated efforts in documentation and dealing with the
-# complications of embedding Haddock markup inside cabal files, it is
-# common to point users to the README.md file.
-description: Please see the README on GitHub at <https://github.com/githubuser/todoCli#readme>
-
 dependencies:
   - base
-  - optparse-applicative
-  - unordered-containers
-  - template-haskell
-  - generic-lens
-  - transformers
-  - regex-tdfa
+  - boxes
   - bytestring
+  - cereal
   - containers
-  - file-embed
-  - microlens
   - directory
+  - file-embed
   - filepath
   - hashable
-  - cereal
-  - witch
-  - boxes
+  - mtl
+  - optparse-applicative
+  - regex-tdfa
+  - template-haskell
   - text
   - time
-  - mtl
-
-ghc-options:
-  - -Wall
-  - -Wcompat
-  - -Widentities
-  - -Wincomplete-record-updates
-  - -Wincomplete-uni-patterns
-  - -Wmissing-export-lists
-  - -Wmissing-home-modules
-  - -Wredundant-constraints
-
-library:
-  source-dirs: src
-  default-extensions:
-    - ImportQualifiedPost
-    - OverloadedStrings
-    - OverloadedLists
-    - BlockArguments
-    - TupleSections
-    - BangPatterns
-    - LambdaCase
-    - DuplicateRecordFields
-    - OverloadedRecordDot
-    - OverloadedLabels
-    - NoFieldSelectors
-    - RecordWildCards
-    - NamedFieldPuns
-    - FlexibleContexts
-    - TypeApplications
-    - DeriveGeneric
-    - DataKinds
-    - DeriveAnyClass
-    - ConstraintKinds
-    - StandaloneDeriving
-    - ScopedTypeVariables
-    - MultiWayIf
-    - GeneralizedNewtypeDeriving
-    - DerivingStrategies
-    - MultiParamTypeClasses
-    - FunctionalDependencies
-    - FlexibleInstances
-    - DerivingVia
-
+  - transformers
+  - unordered-containers
+  - witch
+description: "Please see the README on GitHub at <https://github.com/Choi-Suhyeon/todoCli#readme>"
 executables:
   todo:
-    main: Main.hs
-    source-dirs: app
-    ghc-options:
-      - -threaded
-      - -rtsopts
-      - -with-rtsopts=-N
-    dependencies:
-      - todo
     default-extensions:
-      - ImportQualifiedPost
+      - FlexibleContexts
+      - FlexibleInstances
+      - MultiParamTypeClasses
+      - FunctionalDependencies
+      - ConstraintKinds
+      - ScopedTypeVariables
+      - DataKinds
+      - TypeApplications
+      - DeriveGeneric
+      - DeriveAnyClass
+      - GeneralizedNewtypeDeriving
+      - DerivingStrategies
+      - StandaloneDeriving
+      - DerivingVia
       - OverloadedStrings
       - OverloadedLists
-      - BlockArguments
-      - TupleSections
-      - BangPatterns
-      - LambdaCase
       - DuplicateRecordFields
       - OverloadedRecordDot
       - OverloadedLabels
       - NoFieldSelectors
       - RecordWildCards
       - NamedFieldPuns
-      - FlexibleContexts
-      - TypeApplications
-      - DeriveGeneric
-      - DataKinds
-      - DeriveAnyClass
-      - ConstraintKinds
-      - StandaloneDeriving
-      - ScopedTypeVariables
+      - ImportQualifiedPost
+      - NoImplicitPrelude
+      - PackageImports
+      - BlockArguments
+      - TupleSections
+      - LambdaCase
       - MultiWayIf
-      - GeneralizedNewtypeDeriving
-      - DerivingStrategies
-      - MultiParamTypeClasses
-      - FunctionalDependencies
-      - FlexibleInstances
-      - DerivingVia
-
-tests:
-  todoCli-test:
-    main: Spec.hs
-    source-dirs: test
-    ghc-options:
-      - -threaded
-      - -rtsopts
-      - -with-rtsopts=-N
+      - BangPatterns
+      - NumericUnderscores
     dependencies:
       - todo
+    ghc-options:
+      - "-threaded"
+      - "-rtsopts"
+      - "-with-rtsopts=-N"
+    main: Main.hs
+    source-dirs: app
+extra-source-files:
+  - README.md
+  - CHANGELOG.md
+  - ROADMAP.md
+  - docs/long-help.md
+ghc-options:
+  - "-Wall"
+  - "-Wcompat"
+  - "-Widentities"
+  - "-Wincomplete-record-updates"
+  - "-Wincomplete-uni-patterns"
+  - "-Wmissing-export-lists"
+  - "-Wmissing-home-modules"
+  - "-Wredundant-constraints"
+github: Choi-Suhyeon/todoCli
+library:
+  default-extensions:
+    - FlexibleContexts
+    - FlexibleInstances
+    - MultiParamTypeClasses
+    - FunctionalDependencies
+    - ConstraintKinds
+    - ScopedTypeVariables
+    - DataKinds
+    - TypeApplications
+    - DeriveGeneric
+    - DeriveAnyClass
+    - GeneralizedNewtypeDeriving
+    - DerivingStrategies
+    - StandaloneDeriving
+    - DerivingVia
+    - OverloadedStrings
+    - OverloadedLists
+    - DuplicateRecordFields
+    - OverloadedRecordDot
+    - OverloadedLabels
+    - NoFieldSelectors
+    - RecordWildCards
+    - NamedFieldPuns
+    - ImportQualifiedPost
+    - NoImplicitPrelude
+    - PackageImports
+    - BlockArguments
+    - TupleSections
+    - LambdaCase
+    - MultiWayIf
+    - BangPatterns
+    - NumericUnderscores
+  source-dirs: src
+license: BSD-3-Clause
+maintainer: "SUHYEON CHOI (1AzyF0x) <1AzyF0x@protonmail.ch>"
+name: todo
+version: '2.1.0'

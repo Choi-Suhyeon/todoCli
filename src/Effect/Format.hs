@@ -5,10 +5,11 @@ module Effect.Format
     , renderTableWithout
     ) where
 
-import Data.Bool (bool)
 import Text.PrettyPrint.Boxes (Box, hsep, left, render, text, top, vsep)
 
 import Data.List.NonEmpty qualified as NE
+
+import Common.Prelude
 
 data Column a b = Column
     { colName :: a

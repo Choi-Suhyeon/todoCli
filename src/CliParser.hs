@@ -2,9 +2,8 @@
 
 module CliParser (module CliParser.Options, parseOpts) where
 
-import Control.Monad (mfilter)
 import Data.ByteString (ByteString)
-import Data.Bool (bool)
+import Data.FileEmbed (embedFile)
 import Data.HashSet (HashSet)
 import Data.Text (Text)
 import Data.Time.Calendar (Day (..))
@@ -16,16 +15,15 @@ import Data.Time.Format.ISO8601
 import Data.Time.LocalTime (LocalTime (..), TimeOfDay (..))
 import Data.Version (showVersion)
 import Options.Applicative
-import Text.Regex.TDFA ((=~))
-import Witch
 
-import Data.HashSet qualified as S
+import Data.HashSet qualified as HS
 import Data.Text qualified as T
-import qualified Data.Text.Encoding as TE
+import Data.Text.Encoding qualified as TE
 
 import CliParser.Options
+import Common.Prelude
+import Common.Regex
 import Paths_todo (version)
-import Data.FileEmbed (embedFile)
 
 parseOpts :: IO Options
 parseOpts = execParser opts
@@ -34,8 +32,8 @@ opts :: ParserInfo Options
 opts =
     info (pOptions <**> helper <**> longHelpOpt <**> versionOpt)
         $ fullDesc
-            <> progDesc "Manage your tasks from the command line"
-            <> header (progName <> " - A simple command-line task manager")
+        <> progDesc "Manage your tasks from the command line"
+        <> header (progName <> " - A simple command-line task manager")
 
 progName :: String
 progName = "todo"
@@ -63,8 +61,8 @@ pVerbose :: Parser Bool
 pVerbose =
     switch
         $ short 'v'
-            <> long "verbose"
-            <> help "Show verbose logs during processing"
+        <> long "verbose"
+        <> help "Show verbose logs during processing"
 
 pCommand :: Parser Command
 pCommand = hsubparser $ cAdd <> cList <> cEdit <> cMark <> cDelete
@@ -103,37 +101,37 @@ pAddCommand = AddCommand <$> pName <*> pDeadline <*> pMemo <*> pTags
     pName =
         option nameReader
             $ short 'n'
-                <> long "name"
-                <> metavar "NAME"
-                <> help "Task name"
+            <> long "name"
+            <> metavar "NAME"
+            <> help "Task name"
 
     pDeadline :: Parser OptionDeadline
     pDeadline =
         option datetimeReader
             $ short 'd'
-                <> long "deadline"
-                <> metavar "DEADLINE"
-                <> help
-                    "Deadline (YYYY-MM-DD or ISO 8601 datetime; time defaults to 23:59:59)"
-                <> value Boundless
+            <> long "deadline"
+            <> metavar "DEADLINE"
+            <> help
+                "Deadline (YYYY-MM-DD or ISO 8601 datetime; time defaults to 23:59:59)"
+            <> value Boundless
 
     pMemo :: Parser Text
     pMemo =
         option descReader
             $ short 'm'
-                <> long "memo"
-                <> metavar "MEMO"
-                <> help "Additional task information"
-                <> value T.empty
+            <> long "memo"
+            <> metavar "MEMO"
+            <> help "Additional task information"
+            <> value T.empty
 
     pTags :: Parser (HashSet Text)
     pTags =
         option textSetReader
             $ short 't'
-                <> long "tags"
-                <> metavar "TAGS"
-                <> help "Space-separated tags (maximum 10)"
-                <> value S.empty
+            <> long "tags"
+            <> metavar "TAGS"
+            <> help "Space-separated tags (maximum 10)"
+            <> value HS.empty
 
 pListCommand :: Parser ListCommand
 pListCommand = ListCommand <$> pTags <*> pStatus
@@ -142,19 +140,19 @@ pListCommand = ListCommand <$> pTags <*> pStatus
     pTags =
         option textSetReader
             $ short 't'
-                <> long "tags"
-                <> metavar "TAGS"
-                <> help "Filter by tags (space-separated)"
-                <> value S.empty
+            <> long "tags"
+            <> metavar "TAGS"
+            <> help "Filter by tags (space-separated)"
+            <> value HS.empty
 
     pStatus :: Parser (Maybe ListStatus)
     pStatus =
         optional
             $ option auto
             $ short 's'
-                <> long "status"
-                <> metavar "STATUS"
-                <> help "Filter by status (done, undone, due, overdue)"
+            <> long "status"
+            <> metavar "STATUS"
+            <> help "Filter by status (done, undone, due, overdue)"
 
 pEditCommand :: Parser EditCommand
 pEditCommand = EditCommand <$> pTgtName <*> pName <*> pMemo <*> pTags <*> pDeadline
@@ -167,9 +165,9 @@ pEditCommand = EditCommand <$> pTgtName <*> pName <*> pMemo <*> pTags <*> pDeadl
         optional
             $ option nameReader
             $ short 'n'
-                <> long "name"
-                <> metavar "NAME"
-                <> help "New task name"
+            <> long "name"
+            <> metavar "NAME"
+            <> help "New task name"
 
     pMemo :: Parser (Maybe EditMemo)
     pMemo = optional $ remove <|> memo
@@ -177,14 +175,14 @@ pEditCommand = EditCommand <$> pTgtName <*> pName <*> pMemo <*> pTags <*> pDeadl
         remove =
             flag' Remove
                 $ short 'M'
-                    <> long "clear-memo"
-                    <> help "Clear the task memo"
+                <> long "clear-memo"
+                <> help "Clear the task memo"
         memo =
             option (Memo <$> descReader)
                 $ short 'm'
-                    <> long "memo"
-                    <> metavar "MEMO"
-                    <> help "New additional task information"
+                <> long "memo"
+                <> metavar "MEMO"
+                <> help "New additional task information"
 
     pTags :: Parser (Maybe EditTags)
     pTags = optional $ clear <|> substitute
@@ -192,15 +190,15 @@ pEditCommand = EditCommand <$> pTgtName <*> pName <*> pMemo <*> pTags <*> pDeadl
         clear =
             flag' Clear
                 $ short 'T'
-                    <> long "clear-tag"
-                    <> help "Clear all task tags"
+                <> long "clear-tag"
+                <> help "Clear all task tags"
 
         substitute =
             option (Substitute <$> textSetReader)
                 $ short 't'
-                    <> long "tags"
-                    <> metavar "TAGS"
-                    <> help "New tags (space-separated)"
+                <> long "tags"
+                <> metavar "TAGS"
+                <> help "New tags (space-separated)"
 
     pDeadline :: Parser (Maybe OptionDeadline)
     pDeadline = optional $ boundless <|> bound
@@ -208,23 +206,23 @@ pEditCommand = EditCommand <$> pTgtName <*> pName <*> pMemo <*> pTags <*> pDeadl
         boundless =
             flag' Boundless
                 $ short 'D'
-                    <> long "clear-deadline"
-                    <> help "Clear the task deadline"
+                <> long "clear-deadline"
+                <> help "Clear the task deadline"
 
         bound =
             option datetimeReader
                 $ short 'd'
-                    <> long "deadline"
-                    <> metavar "DEADLINE"
-                    <> help
-                        "New deadline (YYYY-MM-DD or ISO 8601 datetime; time defaults to 23:59:59)"
+                <> long "deadline"
+                <> metavar "DEADLINE"
+                <> help
+                    "New deadline (YYYY-MM-DD or ISO 8601 datetime; time defaults to 23:59:59)"
 
 pMarkCommand :: Parser MarkCommand
 pMarkCommand =
     hsubparser
         $ command "done" (info (MrkDone <$> pName) (progDesc "Mark a task as done"))
-            <> command "undone" (info (MrkUndone <$> pName) (progDesc "Mark a task as undone"))
-            <> metavar "COMMAND"
+        <> command "undone" (info (MrkUndone <$> pName) (progDesc "Mark a task as undone"))
+        <> metavar "COMMAND"
   where
     pName :: Parser Text
     pName = strArgument $ metavar "NAME_PATTERN"
@@ -233,8 +231,8 @@ pDeleteCommand :: Parser DeleteCommand
 pDeleteCommand =
     hsubparser
         $ command "all" (info (pure DelAll) (progDesc "Delete all tasks"))
-            <> command "by" (info pDelBy $ progDesc "Delete tasks matching filters")
-            <> metavar "COMMAND"
+        <> command "by" (info pDelBy $ progDesc "Delete tasks matching filters")
+        <> metavar "COMMAND"
   where
     pDelBy :: Parser DeleteCommand
     pDelBy = DelBy <$> pByName <*> pByTags <*> pByStatus
@@ -244,27 +242,27 @@ pDeleteCommand =
         optional
             $ option nameReader
             $ short 'n'
-                <> long "name"
-                <> metavar "NAME_PATTERN"
-                <> help "Filter by task name"
+            <> long "name"
+            <> metavar "NAME_PATTERN"
+            <> help "Filter by task name"
 
     pByTags :: Parser (Maybe (HashSet Text))
     pByTags =
         optional
             $ option textSetReader
             $ short 't'
-                <> long "tags"
-                <> metavar "TAGS"
-                <> help "Filter by tags (space-separated)"
+            <> long "tags"
+            <> metavar "TAGS"
+            <> help "Filter by tags (space-separated)"
 
     pByStatus :: Parser (Maybe DeleteStatus)
     pByStatus =
         optional
             $ option auto
             $ short 's'
-                <> long "status"
-                <> metavar "STATUS"
-                <> help "Filter by task status (done, overdue)"
+            <> long "status"
+            <> metavar "STATUS"
+            <> help "Filter by task status (done, overdue)"
 
 nameReader :: ReadM Text
 nameReader = maybeReader $ liftA2 (bool Nothing) (Just . T.pack) ((<= 30) . length)
@@ -276,8 +274,10 @@ datetimeReader :: ReadM OptionDeadline
 datetimeReader =
     maybeReader
         $ (<|>)
-            <$> fmap (Bound . fromDayToLocalTime) . parseFormatExtension calendarFormat
-            <*> fmap Bound . iso8601ParseM
+        <$> fmap (Bound . fromDayToLocalTime)
+        . parseFormatExtension calendarFormat
+        <*> fmap Bound
+        . iso8601ParseM
   where
     fromDayToLocalTime :: Day -> LocalTime
     fromDayToLocalTime = (`LocalTime` TimeOfDay 23 59 59)
@@ -286,11 +286,11 @@ textSetReader :: ReadM (HashSet Text)
 textSetReader =
     maybeReader
         $ mfilter isValidSetLen
-            . fmap uniqueWords
-            . mfilter isValidFormat
-            . pure
-            . T.toUpper
-            . T.pack
+        . fmap uniqueWords
+        . mfilter isValidFormat
+        . pure
+        . T.toUpper
+        . T.pack
   where
     isValidFormat :: Text -> Bool
     isValidFormat = (=~ ("^ *[A-Z]{1,10}( +[A-Z]{1,10})* *$" :: Text))
@@ -299,4 +299,4 @@ textSetReader =
     isValidSetLen = liftA2 (&&) (> 0) (<= 4) . length
 
     uniqueWords :: Text -> HashSet Text
-    uniqueWords = S.filter (not . T.null) . S.fromList . T.splitOn " "
+    uniqueWords = HS.filter (not . T.null) . HS.fromList . T.splitOn " "

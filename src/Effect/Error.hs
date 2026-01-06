@@ -1,7 +1,6 @@
 module Effect.Error (MonadEffectError, EffectError (..)) where
 
-import Control.Monad.Except (MonadError (..))
-import Witch
+import Common.Prelude
 
 type MonadEffectError e m = (MonadError e m, From EffectError e)
 

@@ -1,20 +1,21 @@
-module Domain.Serialization (Serializable (..), UsingCereal (..)) where
+module Common.Serialization (Serializable (..), UsingCereal (..), SerializationError (..)) where
 
-import Data.Bifunctor (bimap)
 import Data.ByteString (ByteString)
-import Data.Generics.Labels ()
 import Data.Serialize (Serialize (..), decode, encode)
 
-import Common.Optics
-import Domain.Error
+import Common.Prelude
 
 class Serializable a where
     serialize :: a -> ByteString
-    deserialize :: ByteString -> Either DomainError a
+    deserialize :: ByteString -> Either SerializationError a
 
 newtype UsingCereal a = UsingCereal {unUsingCereal :: a}
-    deriving (Generic, Show)
 
 instance (Serialize a) => Serializable (UsingCereal a) where
     serialize (UsingCereal x) = encode x
     deserialize = bimap DeserializationFailed UsingCereal . decode
+
+data SerializationError = DeserializationFailed String
+
+instance Show SerializationError where
+    show (DeserializationFailed s) = "Deserialization failed: " <> s

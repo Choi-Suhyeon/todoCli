@@ -12,7 +12,7 @@ module Domain
     , TaskDetail (..)
     , TaskDetailDeadline (..)
     , TaskDetailStatus (..)
-    , initTodoRegistry
+    , C.initTodoRegistry
     , getAllTasks
     , getTasksWithAllTags
     , getTasksByNameRegex
@@ -27,37 +27,28 @@ module Domain
     , getTaskDetails
     ) where
 
-import Control.Monad (when)
-import Control.Monad.Reader (ask)
-import Control.Monad.State.Strict (MonadState (..), modify')
-import Data.Either (fromRight)
-import Data.Foldable (for_)
 import Data.HashSet (HashSet)
-import Data.Maybe (fromJust, isJust, mapMaybe)
 import Data.Text (Text)
-import Witch
 
-import Data.HashSet qualified as S
+import Data.HashSet qualified as HS
 import Data.Text qualified as T
 
 import Common
+import Common.Prelude
+import Domain.Core
+    ( EntryCreation (..)
+    , EntryDeadline (..)
+    , EntryPatch (..)
+    , EntryStatus (..)
+    , TaskBasic (..)
+    , TaskId
+    , TodoRegistry
+    )
 import Domain.Error
 import Domain.Log
-import Domain.TaskId
-import Domain.TodoRegistry
-    ( EntryCreation
-    , EntryPatch (..)
-    , EntryDeadline
-    , EntryStatus
-    , TaskBasic (..)
-    , TaskDetail
-    , TaskDetailDeadline (..)
-    , TaskDetailStatus (..)
-    , TodoRegistry
-    , initTodoRegistry
-    )
+import Domain.TaskDetail
 
-import Domain.TodoRegistry qualified as TR
+import Domain.Core qualified as C
 
 type MonadRegistry m = MonadState TodoRegistry m
 
@@ -65,11 +56,13 @@ addTask
     :: (MonadDomainError e m, MonadEnv m, MonadLog m, MonadRegistry m)
     => EntryCreation -> m ()
 addTask e = do
+    reg <- get
     Env{tz, now} <- ask
-    newTask <- liftEitherInto $ TR.mkTask tz now e
+    newTask <- liftEitherInto $ C.mkTask tz now e
+    reg' <- liftEitherInto $ C.insertTask newTask reg
 
-    modify' $ TR.insertTask newTask
-    logMsg $ "task added:\n" <> renderTaskDetail tz (TR.toTaskDetail now newTask)
+    put reg'
+    logMsg $ "task added:\n" <> renderTaskDetail tz (toTaskDetail now newTask)
 
 editTask
     :: (MonadDomainError e m, MonadEnv m, MonadLog m, MonadRegistry m)
@@ -81,17 +74,17 @@ editTask e tid = do
     reg <- get
 
     (oldTask, newTask) <- liftEitherInto do
-        old <- maybeToEither TaskNotFound $ TR.getTaskById tid reg
-        new <- TR.modifyTask tz now e old
+        old <- maybeToEither TaskNotFound $ C.getTaskById tid reg
+        new <- C.modifyTask tz now e old
 
         pure (old, new)
 
     let
-        msgForOld = renderTaskDetail tz $ TR.toTaskDetail now oldTask
-        msgForNew = renderTaskDetail tz $ TR.toTaskDetail now newTask
+        msgForOld = renderTaskDetail tz $ toTaskDetail now oldTask
+        msgForNew = renderTaskDetail tz $ toTaskDetail now newTask
 
     logMsg $ "task updated:\n  (old)\n" <> msgForOld <> "\n  (new)\n" <> msgForNew
-    put $ TR.replaceTask tid newTask reg
+    put $ C.replaceTask tid newTask reg
 
 markTask
     :: (MonadEnv m, MonadLog m, MonadRegistry m) => EntryStatus -> TaskId -> m ()
@@ -99,10 +92,10 @@ markTask s tid = do
     Env{tz, now} <- ask
     reg <- get
 
-    when (TR.isIdInUse tid reg) do
+    when (C.isIdInUse tid reg) do
         let
-            task = fromJust $ TR.getTaskById tid reg
-            TaskBasic{name} = TR.toTaskBasic task
+            task = fromJust $ C.getTaskById tid reg
+            TaskBasic{name} = C.toTaskBasic task
             entry =
                 EntryPatch
                     { name = Nothing
@@ -114,7 +107,7 @@ markTask s tid = do
 
         logMsg $ "task marked " <> (show s & into & T.toLower) <> ": '" <> name <> "'"
         put
-            $ TR.replaceTask tid (fromRight undefined $ TR.modifyTask tz now entry task) reg
+            $ C.replaceTask tid (fromRight undefined $ C.modifyTask tz now entry task) reg
 
 deleteTasks
     :: (MonadEnv m, MonadLog m, MonadRegistry m) => HashSet TaskId -> m ()
@@ -129,11 +122,11 @@ deleteTasks taskIds = do
             ( logMsg
                 . ("task deleted: " <>)
                 . renderTaskSummary
-                . (TR.toTaskDetail now)
+                . (toTaskDetail now)
                 . fromJust
             )
-            . (`TR.getTaskById` reg)
-    put $ S.foldl' (flip TR.deleteTask) reg taskIds
+        . (`C.getTaskById` reg)
+    put $ HS.foldl' (flip C.deleteTask) reg taskIds
 
 getTaskDetails
     :: (MonadEnv m, MonadRegistry m) => HashSet TaskId -> m [TaskDetail]
@@ -142,31 +135,32 @@ getTaskDetails tids = do
     reg <- get
 
     tids
-        & S.toList
-        & mapMaybe ((TR.toTaskDetail now <$>) . (`TR.getTaskById` reg))
+        & HS.toList
+        & mapMaybe ((toTaskDetail now <$>) . (`C.getTaskById` reg))
         & pure
 
 getAllTasks :: (MonadRegistry m) => m (HashSet TaskId)
-getAllTasks = get >>= pure . TR.getAllTasks
+getAllTasks = get >>= pure . C.getTasksMatching (const True)
 
 getDoneTasks :: (MonadRegistry m) => m (HashSet TaskId)
-getDoneTasks = get >>= pure . TR.getDoneTasks
+getDoneTasks = get >>= pure . C.getDoneTasks
 
 getUndoneTasks :: (MonadRegistry m) => m (HashSet TaskId)
-getUndoneTasks = get >>= pure . TR.getUndoneTasks
+getUndoneTasks = get >>= pure . C.getUndoneTasks
 
 getOverdueTasks :: (MonadEnv m, MonadRegistry m) => m (HashSet TaskId)
-getOverdueTasks = ask >>= \Env{now} -> get >>= pure . TR.getOverdueTasks now
+getOverdueTasks = ask >>= \Env{now} -> get >>= pure . C.getTasksUndoneAnd (isOverdue now)
 
 getDueTasks :: (MonadEnv m, MonadRegistry m) => m (HashSet TaskId)
-getDueTasks = ask >>= \Env{now} -> get >>= pure . TR.getDueTasks now
+getDueTasks = ask >>= \Env{now} -> get >>= pure . C.getTasksUndoneAnd (isDue now)
 
 getTasksByNameRegex :: (MonadRegistry m) => Text -> m (HashSet TaskId)
-getTasksByNameRegex pattern = get >>= pure . TR.getTasksByNameRegex pattern
+getTasksByNameRegex pattern =
+    get
+        >>= pure
+        . C.getTasksMatching (\TaskBasic{name} -> matchTest compiled (into @Text name))
+  where
+    compiled = makeRegex pattern :: Regex
 
 getTasksWithAllTags :: (MonadRegistry m) => HashSet Text -> m (HashSet TaskId)
-getTasksWithAllTags tags = get >>= pure . TR.getTasksWithAllTags tags
-
-maybeToEither :: a -> Maybe b -> Either a b
-maybeToEither _ (Just b) = Right b
-maybeToEither a Nothing = Left a
+getTasksWithAllTags tags = get >>= pure . C.getTasksWithAllTags tags

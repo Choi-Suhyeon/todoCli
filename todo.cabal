@@ -5,26 +5,28 @@ cabal-version: 2.2
 -- see: https://github.com/sol/hpack
 
 name:           todo
-version:        2.0.0
-description:    Please see the README on GitHub at <https://github.com/githubuser/todoCli#readme>
-homepage:       https://github.com/githubuser/todoCli#readme
-bug-reports:    https://github.com/githubuser/todoCli/issues
+version:        2.1.0
+description:    Please see the README on GitHub at <https://github.com/Choi-Suhyeon/todoCli#readme>
+homepage:       https://github.com/Choi-Suhyeon/todoCli#readme
+bug-reports:    https://github.com/Choi-Suhyeon/todoCli/issues
 author:         SUHYEON CHOI
-maintainer:     1AzyF0x@protonmail.ch
-copyright:      2025 1AzyF0x(SUHYEON CHOI)
+maintainer:     SUHYEON CHOI (1AzyF0x) <1AzyF0x@protonmail.ch>
+copyright:      2025 SUHYEON CHOI (1AzyF0x)
 license:        BSD-3-Clause
 license-file:   LICENSE
 build-type:     Simple
 extra-source-files:
     README.md
     CHANGELOG.md
+    ROADMAP.md
+    docs/long-help.md
 data-files:
     docs/long-help.txt
     docs/todo.1
 
 source-repository head
   type: git
-  location: https://github.com/githubuser/todoCli
+  location: https://github.com/Choi-Suhyeon/todoCli
 
 library
   exposed-modules:
@@ -33,15 +35,25 @@ library
       Common
       Common.AbstractError
       Common.Env
-      Common.Optics
-      Common.Util
+      Common.Prelude
+      Common.Regex
+      Common.Serialization
+      Common.Serialization.CerealOrphans
       Domain
+      Domain.Core
+      Domain.Core.Invariants
+      Domain.Core.Task
+      Domain.Core.Task.Internal
+      Domain.Core.Task.Raw
+      Domain.Core.TaskId
+      Domain.Core.TaskId.Internal
+      Domain.Core.TaskId.Raw
+      Domain.Core.TodoRegistry
+      Domain.Core.TodoRegistry.Internal
+      Domain.Core.TodoRegistry.Raw
       Domain.Error
       Domain.Log
-      Domain.Serialization
-      Domain.Serialization.CerealOrphans
-      Domain.TaskId
-      Domain.TodoRegistry
+      Domain.TaskDetail
       Effect
       Effect.Error
       Effect.Format
@@ -54,34 +66,37 @@ library
   hs-source-dirs:
       src
   default-extensions:
-      ImportQualifiedPost
+      FlexibleContexts
+      FlexibleInstances
+      MultiParamTypeClasses
+      FunctionalDependencies
+      ConstraintKinds
+      ScopedTypeVariables
+      DataKinds
+      TypeApplications
+      DeriveGeneric
+      DeriveAnyClass
+      GeneralizedNewtypeDeriving
+      DerivingStrategies
+      StandaloneDeriving
+      DerivingVia
       OverloadedStrings
       OverloadedLists
-      BlockArguments
-      TupleSections
-      BangPatterns
-      LambdaCase
       DuplicateRecordFields
       OverloadedRecordDot
       OverloadedLabels
       NoFieldSelectors
       RecordWildCards
       NamedFieldPuns
-      FlexibleContexts
-      TypeApplications
-      DeriveGeneric
-      DataKinds
-      DeriveAnyClass
-      ConstraintKinds
-      StandaloneDeriving
-      ScopedTypeVariables
+      ImportQualifiedPost
+      NoImplicitPrelude
+      PackageImports
+      BlockArguments
+      TupleSections
+      LambdaCase
       MultiWayIf
-      GeneralizedNewtypeDeriving
-      DerivingStrategies
-      MultiParamTypeClasses
-      FunctionalDependencies
-      FlexibleInstances
-      DerivingVia
+      BangPatterns
+      NumericUnderscores
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wredundant-constraints
   build-depends:
       base
@@ -92,9 +107,7 @@ library
     , directory
     , file-embed
     , filepath
-    , generic-lens
     , hashable
-    , microlens
     , mtl
     , optparse-applicative
     , regex-tdfa
@@ -115,34 +128,37 @@ executable todo
   hs-source-dirs:
       app
   default-extensions:
-      ImportQualifiedPost
+      FlexibleContexts
+      FlexibleInstances
+      MultiParamTypeClasses
+      FunctionalDependencies
+      ConstraintKinds
+      ScopedTypeVariables
+      DataKinds
+      TypeApplications
+      DeriveGeneric
+      DeriveAnyClass
+      GeneralizedNewtypeDeriving
+      DerivingStrategies
+      StandaloneDeriving
+      DerivingVia
       OverloadedStrings
       OverloadedLists
-      BlockArguments
-      TupleSections
-      BangPatterns
-      LambdaCase
       DuplicateRecordFields
       OverloadedRecordDot
       OverloadedLabels
       NoFieldSelectors
       RecordWildCards
       NamedFieldPuns
-      FlexibleContexts
-      TypeApplications
-      DeriveGeneric
-      DataKinds
-      DeriveAnyClass
-      ConstraintKinds
-      StandaloneDeriving
-      ScopedTypeVariables
+      ImportQualifiedPost
+      NoImplicitPrelude
+      PackageImports
+      BlockArguments
+      TupleSections
+      LambdaCase
       MultiWayIf
-      GeneralizedNewtypeDeriving
-      DerivingStrategies
-      MultiParamTypeClasses
-      FunctionalDependencies
-      FlexibleInstances
-      DerivingVia
+      BangPatterns
+      NumericUnderscores
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base
@@ -153,43 +169,7 @@ executable todo
     , directory
     , file-embed
     , filepath
-    , generic-lens
     , hashable
-    , microlens
-    , mtl
-    , optparse-applicative
-    , regex-tdfa
-    , template-haskell
-    , text
-    , time
-    , todo
-    , transformers
-    , unordered-containers
-    , witch
-  default-language: Haskell2010
-
-test-suite todoCli-test
-  type: exitcode-stdio-1.0
-  main-is: Spec.hs
-  other-modules:
-      Paths_todo
-  autogen-modules:
-      Paths_todo
-  hs-source-dirs:
-      test
-  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
-  build-depends:
-      base
-    , boxes
-    , bytestring
-    , cereal
-    , containers
-    , directory
-    , file-embed
-    , filepath
-    , generic-lens
-    , hashable
-    , microlens
     , mtl
     , optparse-applicative
     , regex-tdfa

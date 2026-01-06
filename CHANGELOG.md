@@ -8,6 +8,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 _No unreleased changes yet._
 
+## [2.1.0] - 2026-01-06
+
+### Added
+- Added Dhall configuration files (`package.dhall`, `stack.dhall`, `hie.dhall`, `fourmolu.dhall`) to minimize repetition and cognitive overhead in YAML configs.
+- Introduced a project-specific Prelude for consistent defaults and reduced explicit imports.
+- Added validation of persisted Todo registry data on load.
+- Added automatic recovery logic for corrupted or inconsistent registry state.
+
+### Changed
+- Replaced Generic-derived instances with manual implementations for Serialize and Hashable
+- Removed lens dependency
+
+### Fixed
+- Strengthened edge case verification for TaskId
+
 ## [2.0.0] - 2025-12-10
 
 ### Added
