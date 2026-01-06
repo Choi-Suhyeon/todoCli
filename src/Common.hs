@@ -6,6 +6,6 @@ module Common
     ) where
 
 import Common.AbstractError
-import Common.Serialization
 import Common.Env
 import Common.Regex
+import Common.Serialization

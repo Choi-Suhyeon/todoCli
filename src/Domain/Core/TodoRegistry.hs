@@ -7,13 +7,11 @@ module Domain.Core.TodoRegistry
       -- * Internal(Domain) Query
     , isIdInUse
     , getTaskById
-    , getAllTasks
     , getDoneTasks
-    , getDueTasks
-    , getOverdueTasks
     , getUndoneTasks
-    , getTasksByNameRegex
+    , getTasksUndoneAnd
     , getTasksWithAllTags
+    , getTasksMatching
 
       -- * Internal(Domain) Update/Delete
     , insertTask

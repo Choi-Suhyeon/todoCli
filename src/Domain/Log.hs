@@ -11,7 +11,7 @@ import Data.List qualified as L
 import Data.Text qualified as T
 
 import Common.Prelude
-import Domain.Core
+import Domain.TaskDetail
 
 type MonadLog m = MonadWriter Log m
 
@@ -32,7 +32,13 @@ renderTaskDetail tz TaskDetail{name, status, deadline, tags, memo} =
 
 renderTaskSummary :: TaskDetail -> Text
 renderTaskSummary TaskDetail{name, status, tags} =
-    mconcat [into $ show status, " task '", name, "' ", renderTags True tags]
+    mconcat
+        [ into $ show status
+        , " task '"
+        , name
+        , "' "
+        , if HS.null tags then "" else renderTags True tags
+        ]
 
 renderDeadline :: TimeZone -> TaskDetailDeadline -> Text
 renderDeadline _ DBoundless = "N/A"

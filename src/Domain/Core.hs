@@ -7,5 +7,5 @@ module Domain.Core
 
 import Domain.Core.Invariants
 import Domain.Core.Task
-import Domain.Core.TaskId (TaskId)
+import Domain.Core.TaskId
 import Domain.Core.TodoRegistry

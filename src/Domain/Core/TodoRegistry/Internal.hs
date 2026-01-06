@@ -1,5 +1,5 @@
 module Domain.Core.TodoRegistry.Internal
-    ( TodoRegistry (..)
+    ( TodoRegistry
 
       -- * Public Construction
     , initTodoRegistry
@@ -7,13 +7,11 @@ module Domain.Core.TodoRegistry.Internal
       -- * Internal(Domain) Query
     , isIdInUse
     , getTaskById
-    , getAllTasks
     , getDoneTasks
-    , getDueTasks
-    , getOverdueTasks
     , getUndoneTasks
-    , getTasksByNameRegex
+    , getTasksUndoneAnd
     , getTasksWithAllTags
+    , getTasksMatching
 
       -- * Internal(Domain) Update/Delete
     , insertTask
@@ -23,9 +21,7 @@ module Domain.Core.TodoRegistry.Internal
 
 import Data.HashSet (HashSet)
 import Data.Hashable (Hashable (..))
-import Data.IntMap (IntMap)
 import Data.Map (Map)
-import Data.Serialize (Serialize (..))
 import Data.Text (Text)
 import Data.Time.Clock (UTCTime (..))
 
@@ -33,31 +29,12 @@ import Data.HashSet qualified as HS
 import Data.IntMap qualified as IM
 import Data.Map qualified as M
 
-import Common
-import Common.Prelude hiding (get, put)
-import Domain.Core.Internal
-import Domain.Core.Task
-import Domain.Core.Task.Internal (Task, TaskStatus)
-import Domain.Core.TaskId
-import Domain.Error
+import Common.Prelude
 import Common.Serialization.CerealOrphans ()
-
-data TodoRegistry = TodoRegistry
-    { ids :: !Ids
-    , idToTask :: !(IntMap Task)
-    , tagToId :: !(Map Text (HashSet TaskId))
-    , statusToId :: !(Map TaskStatus (HashSet TaskId))
-    }
-    deriving (Show)
-
-instance Serialize TodoRegistry where
-    put TodoRegistry{..} = do
-        put ids
-        put idToTask
-        put tagToId
-        put statusToId
-
-    get = TodoRegistry <$> get <*> get <*> get <*> get
+import Domain.Core.Task.Internal
+import Domain.Core.TaskId.Internal
+import Domain.Core.TodoRegistry.Raw
+import Domain.Error
 
 initTodoRegistry :: TodoRegistry
 initTodoRegistry = TodoRegistry initIds IM.empty M.empty M.empty
@@ -120,59 +97,11 @@ deleteTask tid reg@TodoRegistry{..}
 getTaskById :: TaskId -> TodoRegistry -> Maybe Task
 getTaskById tid TodoRegistry{idToTask} = IM.lookup (into tid) idToTask
 
-getAllTasks :: TodoRegistry -> HashSet TaskId
-getAllTasks = getTasksMatching (const True)
-
 getDoneTasks :: TodoRegistry -> HashSet TaskId
 getDoneTasks = getTasksByStatus $ into BDone
 
 getUndoneTasks :: TodoRegistry -> HashSet TaskId
 getUndoneTasks = getTasksByStatus $ into BUndone
-
-getOverdueTasks :: UTCTime -> TodoRegistry -> HashSet TaskId
-getOverdueTasks now = getTasksUndoneAnd $ isOverdue now
-
-getDueTasks :: UTCTime -> TodoRegistry -> HashSet TaskId
-getDueTasks now = getTasksUndoneAnd $ isDue now
-
-getTasksByNameRegex :: Text -> TodoRegistry -> HashSet TaskId
-getTasksByNameRegex pattern = getTasksMatching (\TaskBasic{name} -> matchTest compiled (into @Text name))
-  where
-    compiled = makeRegex pattern :: Regex
-
-getTasksWithAllTags :: HashSet Text -> TodoRegistry -> HashSet TaskId
-getTasksWithAllTags tags reg@TodoRegistry{tagToId}
-    | HS.null tags = getAllTasks reg
-    | otherwise =
-        tags
-            & HS.map (\t -> M.findWithDefault HS.empty t tagToId & Intersection)
-            & foldr1 (<>)
-            & into
-
--- private
-
-newtype Intersection a = Intersection {getIntersection :: HashSet a}
-    deriving stock (Eq, Show)
-    deriving newtype (Hashable)
-
-instance (Eq a, Hashable a) => Semigroup (Intersection a) where
-    Intersection x <> Intersection y = Intersection (HS.intersection x y)
-
-instance From (Intersection a) (HashSet a)
-
-instance From (HashSet a) (Intersection a)
-
-getTasksMatching :: (TaskBasic -> Bool) -> TodoRegistry -> HashSet TaskId
-getTasksMatching predicate TodoRegistry{idToTask} =
-    IM.foldrWithKey insertKeyWhen HS.empty idToTask
-  where
-    insertKeyWhen :: Int -> Task -> HashSet TaskId -> HashSet TaskId
-    insertKeyWhen key task set
-        | predicate $ toTaskBasic task = HS.insert (into key) set
-        | otherwise = set
-
-getTasksByStatus :: TaskStatus -> TodoRegistry -> HashSet TaskId
-getTasksByStatus s TodoRegistry{statusToId} = M.findWithDefault HS.empty s statusToId
 
 getTasksUndoneAnd :: (UTCTime -> Bool) -> TodoRegistry -> HashSet TaskId
 getTasksUndoneAnd p reg@TodoRegistry{idToTask} =
@@ -187,6 +116,40 @@ getTasksUndoneAnd p reg@TodoRegistry{idToTask} =
       where
         deadline :: Maybe TaskBasicDeadline
         deadline = (.deadline) . toTaskBasic <$> task
+
+getTasksWithAllTags :: HashSet Text -> TodoRegistry -> HashSet TaskId
+getTasksWithAllTags tags reg@TodoRegistry{tagToId}
+    | HS.null tags = getTasksMatching (const True) reg
+    | otherwise =
+        tags
+            & HS.map (\t -> M.findWithDefault HS.empty t tagToId & Intersection)
+            & foldr1 (<>)
+            & into
+
+getTasksMatching :: (TaskBasic -> Bool) -> TodoRegistry -> HashSet TaskId
+getTasksMatching predicate TodoRegistry{idToTask} =
+    IM.foldrWithKey insertKeyWhen HS.empty idToTask
+  where
+    insertKeyWhen :: Int -> Task -> HashSet TaskId -> HashSet TaskId
+    insertKeyWhen key task set
+        | predicate $ toTaskBasic task = HS.insert (into key) set
+        | otherwise = set
+
+-- private
+
+newtype Intersection a = Intersection {getIntersection :: HashSet a}
+    deriving stock (Eq, Show)
+    deriving newtype (Hashable)
+
+instance (Eq a, Hashable a) => Semigroup (Intersection a) where
+    Intersection x <> Intersection y = Intersection (HS.intersection x y)
+
+instance From (Intersection a) (HashSet a)
+
+instance From (HashSet a) (Intersection a)
+
+getTasksByStatus :: TaskStatus -> TodoRegistry -> HashSet TaskId
+getTasksByStatus s TodoRegistry{statusToId} = M.findWithDefault HS.empty s statusToId
 
 deleteFromSetsAtKeys
     :: (Foldable t, Hashable a, Ord k)

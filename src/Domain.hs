@@ -41,17 +41,12 @@ import Domain.Core
     , EntryPatch (..)
     , EntryStatus (..)
     , TaskBasic (..)
-    , TaskDetail (..)
-    , TaskDetailDeadline (..)
-    , TaskDetailStatus (..)
     , TaskId
     , TodoRegistry
     )
 import Domain.Error
 import Domain.Log
-
--- todo: core 내부 export list를 보고 정리하고 문서화.
--- core 자체의 export 리스트도 타입만 빼는지 생성자도 빼야하는지 보고 확인, 문서화.
+import Domain.TaskDetail
 
 import Domain.Core qualified as C
 
@@ -67,7 +62,7 @@ addTask e = do
     reg' <- liftEitherInto $ C.insertTask newTask reg
 
     put reg'
-    logMsg $ "task added:\n" <> renderTaskDetail tz (C.toTaskDetail now newTask)
+    logMsg $ "task added:\n" <> renderTaskDetail tz (toTaskDetail now newTask)
 
 editTask
     :: (MonadDomainError e m, MonadEnv m, MonadLog m, MonadRegistry m)
@@ -85,8 +80,8 @@ editTask e tid = do
         pure (old, new)
 
     let
-        msgForOld = renderTaskDetail tz $ C.toTaskDetail now oldTask
-        msgForNew = renderTaskDetail tz $ C.toTaskDetail now newTask
+        msgForOld = renderTaskDetail tz $ toTaskDetail now oldTask
+        msgForNew = renderTaskDetail tz $ toTaskDetail now newTask
 
     logMsg $ "task updated:\n  (old)\n" <> msgForOld <> "\n  (new)\n" <> msgForNew
     put $ C.replaceTask tid newTask reg
@@ -127,7 +122,7 @@ deleteTasks taskIds = do
             ( logMsg
                 . ("task deleted: " <>)
                 . renderTaskSummary
-                . (C.toTaskDetail now)
+                . (toTaskDetail now)
                 . fromJust
             )
         . (`C.getTaskById` reg)
@@ -141,11 +136,11 @@ getTaskDetails tids = do
 
     tids
         & HS.toList
-        & mapMaybe ((C.toTaskDetail now <$>) . (`C.getTaskById` reg))
+        & mapMaybe ((toTaskDetail now <$>) . (`C.getTaskById` reg))
         & pure
 
 getAllTasks :: (MonadRegistry m) => m (HashSet TaskId)
-getAllTasks = get >>= pure . C.getAllTasks
+getAllTasks = get >>= pure . C.getTasksMatching (const True)
 
 getDoneTasks :: (MonadRegistry m) => m (HashSet TaskId)
 getDoneTasks = get >>= pure . C.getDoneTasks
@@ -154,13 +149,18 @@ getUndoneTasks :: (MonadRegistry m) => m (HashSet TaskId)
 getUndoneTasks = get >>= pure . C.getUndoneTasks
 
 getOverdueTasks :: (MonadEnv m, MonadRegistry m) => m (HashSet TaskId)
-getOverdueTasks = ask >>= \Env{now} -> get >>= pure . C.getOverdueTasks now
+getOverdueTasks = ask >>= \Env{now} -> get >>= pure . C.getTasksUndoneAnd (isOverdue now)
 
 getDueTasks :: (MonadEnv m, MonadRegistry m) => m (HashSet TaskId)
-getDueTasks = ask >>= \Env{now} -> get >>= pure . C.getDueTasks now
+getDueTasks = ask >>= \Env{now} -> get >>= pure . C.getTasksUndoneAnd (isDue now)
 
 getTasksByNameRegex :: (MonadRegistry m) => Text -> m (HashSet TaskId)
-getTasksByNameRegex pattern = get >>= pure . C.getTasksByNameRegex pattern
+getTasksByNameRegex pattern =
+    get
+        >>= pure
+        . C.getTasksMatching (\TaskBasic{name} -> matchTest compiled (into @Text name))
+  where
+    compiled = makeRegex pattern :: Regex
 
 getTasksWithAllTags :: (MonadRegistry m) => HashSet Text -> m (HashSet TaskId)
 getTasksWithAllTags tags = get >>= pure . C.getTasksWithAllTags tags

@@ -41,16 +41,19 @@ library
       Common.Serialization.CerealOrphans
       Domain
       Domain.Core
-      Domain.Core.Internal
       Domain.Core.Invariants
       Domain.Core.Task
       Domain.Core.Task.Internal
+      Domain.Core.Task.Raw
       Domain.Core.TaskId
       Domain.Core.TaskId.Internal
+      Domain.Core.TaskId.Raw
       Domain.Core.TodoRegistry
       Domain.Core.TodoRegistry.Internal
+      Domain.Core.TodoRegistry.Raw
       Domain.Error
       Domain.Log
+      Domain.TaskDetail
       Effect
       Effect.Error
       Effect.Format

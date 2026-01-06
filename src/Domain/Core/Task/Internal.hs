@@ -1,99 +1,165 @@
 module Domain.Core.Task.Internal
-    ( Task (..)
-    , TaskName (..)
-    , TaskMemo (..)
-    , TaskStatus (..)
-    , TaskTags (..)
-    , TaskDeadline (..)
+    ( -- * Internal
+      TaskStatus
+    , TaskDeadline
+
+      -- * Public Types
+    , Task
+
+      -- * Public InBound Types
+    , EntryCreation (..)
+    , EntryPatch (..)
+    , EntryDeadline (..)
+    , EntryStatus (..)
+
+      -- * Public Outbound Types
+    , TaskBasic (..)
+    , TaskBasicStatus (..)
+    , TaskBasicDeadline (..)
+
+      -- * Public(Domain) API
+    , mkTask
+    , modifyTask
+    , toTaskBasic
     ) where
 
 import Data.HashSet (HashSet)
-import Data.Hashable (Hashable (..))
-import Data.Serialize (Serialize (..), getWord8, putWord8)
 import Data.Text (Text)
-import Data.Time.Calendar (toModifiedJulianDay)
 import Data.Time.Clock (UTCTime (..))
+import Data.Time.LocalTime (TimeZone, utcToLocalTime)
 
 import Common.Prelude hiding (get, put)
-import Common.Serialization.CerealOrphans ()
+import Domain.Core.Task.Raw
+import Domain.Error
 
-data Task = Task
-    { name :: !TaskName
-    , memo :: !TaskMemo
-    , tags :: !TaskTags
-    , status :: !TaskStatus
-    , deadline :: !TaskDeadline
+data EntryCreation = EntryCreation
+    { name :: !Text
+    , memo :: !Text
+    , tags :: !(HashSet Text)
+    , deadline :: !EntryDeadline
     }
     deriving (Show)
 
-instance Serialize Task where
-    put Task{..} = do
-        put name
-        put memo
-        put tags
-        put status
-        put deadline
+data EntryPatch = EntryPatch
+    { name :: !(Maybe Text)
+    , memo :: !(Maybe Text)
+    , tags :: !(Maybe (HashSet Text))
+    , deadline :: !(Maybe EntryDeadline)
+    , status :: !(Maybe EntryStatus)
+    }
+    deriving (Show)
 
-    get = Task <$> get <*> get <*> get <*> get <*> get
+data EntryDeadline
+    = EBoundless
+    | EBound UTCTime
+    deriving (Show)
 
-newtype TaskName = TaskName {unTaskName :: Text}
-    deriving stock (Eq, Ord, Show)
-    deriving (Hashable, IsString, Serialize) via Text
+instance From EntryDeadline TaskDeadline where
+    from EBoundless = Boundless
+    from (EBound t) = Bound t
 
-instance From Text TaskName
-instance From TaskName Text
+data EntryStatus
+    = EDone
+    | EUndone
 
-newtype TaskMemo = TaskMemo {unTaskMemo :: Text}
-    deriving stock (Eq, Ord, Show)
-    deriving (Hashable, IsString, Serialize) via Text
+instance Show EntryStatus where
+    show EDone = "done"
+    show EUndone = "undone"
 
-instance From Text TaskMemo
-instance From TaskMemo Text
+instance From EntryStatus TaskStatus where
+    from EDone = Done
+    from EUndone = Undone
 
-data TaskStatus = Done | Undone
-    deriving (Eq, Ord, Show)
+instance From TaskStatus EntryStatus where
+    from Done = EDone
+    from Undone = EUndone
 
-instance Hashable TaskStatus where
-    hashWithSalt s Done = s `hashWithSalt` (0 :: Int)
-    hashWithSalt s Undone = s `hashWithSalt` (1 :: Int)
+data TaskBasic = TaskBasic
+    { name :: !Text
+    , memo :: !Text
+    , tags :: !(HashSet Text)
+    , status :: !TaskBasicStatus
+    , deadline :: TaskBasicDeadline
+    }
+    deriving (Show)
 
-instance Serialize TaskStatus where
-    put Undone = putWord8 0
-    put Done = putWord8 1
+data TaskBasicStatus
+    = BDone
+    | BUndone
+    deriving (Eq, Ord)
 
-    get =
-        getWord8 >>= \case
-            0 -> pure Undone
-            1 -> pure Done
-            _ -> fail "TaskStatus: invalid tag"
+instance Show TaskBasicStatus where
+    show BDone = "done"
+    show BUndone = "undone"
 
-newtype TaskTags = TaskTags {unTaskTags :: HashSet Text}
-    deriving stock (Eq, Ord, Show)
-    deriving (Hashable, Semigroup, Serialize) via (HashSet Text)
+instance From TaskStatus TaskBasicStatus where
+    from Done = BDone
+    from Undone = BUndone
 
-instance From (HashSet Text) TaskTags
-instance From TaskTags (HashSet Text)
+instance From TaskBasicStatus TaskStatus where
+    from BDone = Done
+    from BUndone = Undone
 
-data TaskDeadline
-    = Boundless
-    | Bound UTCTime
-    deriving (Eq, Ord, Show)
+data TaskBasicDeadline
+    = BBoundless
+    | BBound UTCTime
+    deriving (Eq, Show)
 
-instance Hashable TaskDeadline where
-    hashWithSalt salt Boundless =
-        salt `hashWithSalt` (0 :: Int)
-    hashWithSalt salt (Bound (UTCTime day diffTime)) =
-        salt
-            `hashWithSalt` (1 :: Int)
-            `hashWithSalt` toModifiedJulianDay day
-            `hashWithSalt` (truncate (diffTime * 1000000000) :: Integer)
+instance From TaskDeadline TaskBasicDeadline where
+    from Boundless = BBoundless
+    from (Bound d) = BBound d
 
-instance Serialize TaskDeadline where
-    put Boundless = putWord8 0
-    put (Bound utc) = putWord8 1 *> put utc
+instance Ord TaskBasicDeadline where
+    compare BBoundless BBoundless = EQ
+    compare BBoundless (BBound _) = GT
+    compare (BBound _) BBoundless = LT
+    compare (BBound d1) (BBound d2) = d1 `compare` d2
 
-    get =
-        getWord8 >>= \case
-            0 -> pure Boundless
-            1 -> Bound <$> get
-            _ -> fail "TaskDeadline: invalid tag"
+mkTask :: TimeZone -> UTCTime -> EntryCreation -> Either DomainError Task
+mkTask tz now EntryCreation{..}
+    | EBound d <- deadline, Left e <- validateDeadline tz now d = Left e
+    | otherwise =
+        Right
+            Task
+                { name = into name
+                , memo = into memo
+                , tags = into tags
+                , deadline = into deadline
+                , status = Undone
+                }
+
+modifyTask
+    :: TimeZone -> UTCTime -> EntryPatch -> Task -> Either DomainError Task
+modifyTask tz now entry task
+    | Just (EBound d) <- entry.deadline
+    , Left e <- validateDeadline tz now d =
+        Left e
+    | otherwise =
+        Right
+            Task
+                { name = fromMaybe task.name $ into <$> entry.name
+                , memo = fromMaybe task.memo $ into <$> entry.memo
+                , tags = fromMaybe task.tags $ into <$> entry.tags
+                , deadline = fromMaybe task.deadline (into <$> entry.deadline)
+                , status = maybe task.status into entry.status
+                }
+
+toTaskBasic :: Task -> TaskBasic
+toTaskBasic Task{..} =
+    TaskBasic
+        { name = into name
+        , memo = into memo
+        , tags = into tags
+        , status = into status
+        , deadline = into deadline
+        }
+
+validateDeadline :: TimeZone -> UTCTime -> UTCTime -> Either DomainError ()
+validateDeadline tz now dd
+    | dd > now = Right ()
+    | otherwise =
+        let
+            nowL = utcToLocalTime tz now
+            ddL = utcToLocalTime tz dd
+         in
+            Left $ InvalidDeadline nowL ddL
