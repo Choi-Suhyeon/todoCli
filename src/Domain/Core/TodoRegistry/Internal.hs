@@ -122,8 +122,8 @@ getTasksWithAllTags tags reg@TodoRegistry{tagToId}
     | HS.null tags = getTasksMatching (const True) reg
     | otherwise =
         tags
-            & HS.map (\t -> M.findWithDefault HS.empty t tagToId & Intersection)
-            & foldr1 (<>)
+            & HS.map (\t -> M.findWithDefault HS.empty t tagToId)
+            & foldr1 HS.intersection
             & into
 
 getTasksMatching :: (TaskBasic -> Bool) -> TodoRegistry -> HashSet TaskId
@@ -136,18 +136,6 @@ getTasksMatching predicate TodoRegistry{idToTask} =
         | otherwise = set
 
 -- private
-
-newtype Intersection a = Intersection {getIntersection :: HashSet a}
-    deriving stock (Eq, Show)
-    deriving newtype (Hashable)
-
-instance (Eq a, Hashable a) => Semigroup (Intersection a) where
-    Intersection x <> Intersection y = Intersection (HS.intersection x y)
-
-instance From (Intersection a) (HashSet a)
-
-instance From (HashSet a) (Intersection a)
-
 getTasksByStatus :: TaskStatus -> TodoRegistry -> HashSet TaskId
 getTasksByStatus s TodoRegistry{statusToId} = M.findWithDefault HS.empty s statusToId
 

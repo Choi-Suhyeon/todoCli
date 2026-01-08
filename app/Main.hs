@@ -2,7 +2,10 @@
 
 module Main (main) where
 
+import Control.Arrow ((>>>))
 import Control.Exception (ErrorCall, evaluate, try)
+import Data.HashSet (HashSet)
+import Data.List (foldl1')
 import Data.Text (Text)
 import Data.Time.Clock (getCurrentTime)
 import Data.Time.LocalTime (getCurrentTimeZone, localTimeToUTC)
@@ -146,23 +149,26 @@ runCommand (Mark x) = runMarkCommand x
 runCommand (Delete x) = runDeleteCommand x
 
 runAddCommand :: AddCommand -> App ()
-runAddCommand AddCommand{name, deadline, memo, tags} = do
-    optionDeadlineToEntryDeadline deadline >>= \utcDeadline -> addTask EntryCreation{name, memo, tags, deadline = utcDeadline}
+runAddCommand AddCommand{name, deadline, memo, tags, importance} = do
+    optionDeadlineToEntryDeadline deadline >>= \utcDeadline -> addTask EntryCreation{name, memo, tags, importance, deadline = utcDeadline}
 
 runListCommand :: ListCommand -> App ()
-runListCommand ListCommand{tags, status} = do
+runListCommand ListCommand{tags, status, importance} = do
     tz <- asks (.tz)
-    tasks' <- getTasksWithAllTags tags
-    tasks'' <- case status of
-        Nothing -> getAllTasks
-        Just s -> case s of
-            LstDone -> getDoneTasks
-            LstUndone -> getUndoneTasks
-            LstDue -> getDueTasks
-            LstOverdue -> getOverdueTasks
+    allTasks <- getAllTasks
+    tasks1 <- traverse getTasksWithAllTags tags
+    tasks2 <- traverse getTasksWithinImportanceRange importance
+    tasks3 <- (`traverse` status) \case
+        LstDone -> getDoneTasks
+        LstUndone -> getUndoneTasks
+        LstDue -> getDueTasks
+        LstOverdue -> getOverdueTasks
 
     snapshots <-
-        HS.intersection tasks' tasks''
+        [tasks1, tasks2, tasks3]
+            & catMaybes
+            & foldl' HS.intersection allTasks
+            & into
             & getTaskDetails
             & fmap sortTaskDetails
 
@@ -170,26 +176,31 @@ runListCommand ListCommand{tags, status} = do
     pure ()
 
 runEditCommand :: EditCommand -> App ()
-runEditCommand EditCommand{tgtName, name, deadline, memo, tags} = do
+runEditCommand EditCommand{tgtName, name, deadline, memo, tags, importance} = do
     target <- getUniqueTarget tgtName
     utcDeadline <- traverse optionDeadlineToEntryDeadline deadline
 
-    let
-        entryPatch =
-            EntryPatch
-                { name
-                , memo = (<$> memo) \case
-                    Remove -> ""
-                    Memo m -> m
-                , status = Nothing
-                , deadline = utcDeadline
-                , tags = case tags of
-                    Nothing -> Nothing
-                    Just Clear -> Just mempty
-                    Just (Substitute s) -> Just s
-                }
+    flip
+        editTask
+        target
+        EntryPatch
+            { name
+            , importance
+            , status = Nothing
+            , deadline = utcDeadline
+            , memo = processMemo memo
+            , tags = processTags tags
+            }
+  where
+    processMemo :: Maybe EditMemo -> Maybe Text
+    processMemo (Just Remove) = Just ""
+    processMemo (Just (Memo m)) = Just m
+    processMemo Nothing = Nothing
 
-    editTask entryPatch target
+    processTags :: Maybe EditTags -> Maybe (HashSet Text)
+    processTags (Just Clear) = Just mempty
+    processTags (Just (Substitute s)) = Just s
+    processTags Nothing = Nothing
 
 runMarkCommand :: MarkCommand -> App ()
 runMarkCommand (MrkDone tgtName) = getUniqueTarget tgtName >>= markTask EDone
@@ -197,26 +208,26 @@ runMarkCommand (MrkUndone tgtName) = getUniqueTarget tgtName >>= markTask EUndon
 
 runDeleteCommand :: DeleteCommand -> App ()
 runDeleteCommand DelAll = getAllTasks >>= deleteTasks
-runDeleteCommand DelBy{byName, byTags, byStatus} = do
-    tasks' <- traverse getTasksByNameRegex byName
-    tasks'' <- traverse getTasksWithAllTags byTags
-    tasks''' <- (`traverse` byStatus) \case
+runDeleteCommand DelBy{byName, byTags, byStatus, byImportance} = do
+    tasks1 <- traverse getTasksByNameRegex byName
+    tasks2 <- traverse getTasksWithAllTags byTags
+    tasks3 <- traverse getTasksWithinImportanceRange byImportance
+    tasks4 <- (`traverse` byStatus) \case
         DelDone -> getDoneTasks
         DelOverdue -> getOverdueTasks
 
     tasks <-
-        [tasks', tasks'', tasks''']
+        [tasks1, tasks2, tasks3, tasks4]
             & catMaybes
-            & foldr1 HS.intersection
-            & evaluate
-            & try @ErrorCall
-            & liftIO
-            >>= \case
-                Left _ -> throwError $ ParserE NoOptionsProvided
-                Right [] -> throwError $ ParserE DeletionTargetNotFound
-                Right xs -> pure xs
+            & foldl1' HS.intersection
+            & (evaluate >>> try @ErrorCall >>> liftIO >=> handleResult)
 
     deleteTasks tasks
+  where
+    handleResult :: Either ErrorCall (HashSet TaskId) -> App (HashSet TaskId)
+    handleResult (Left _) = throwError $ ParserE NoOptionsProvided
+    handleResult (Right []) = throwError $ ParserE DeletionTargetNotFound
+    handleResult (Right xs) = pure xs
 
 getUniqueTarget :: (MonadError AppError m, MonadRegistry m) => Text -> m TaskId
 getUniqueTarget = getTasksByNameRegex >=> getFromSingleton

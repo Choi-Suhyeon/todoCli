@@ -22,14 +22,15 @@ data TaskDetail = TaskDetail
     , tags :: !(HashSet Text)
     , status :: !TaskDetailStatus
     , deadline :: !TaskDetailDeadline
+    , importance :: !Word
     }
     deriving (Show)
 
 data TaskDetailStatus
     = DDone
     | DUndone
-    | DDue
     | DOverdue
+    | DDue
     deriving (Eq, Ord)
 
 instance Show TaskDetailStatus where
@@ -62,6 +63,7 @@ toTaskDetailFromBasic now TaskBasic{..} =
         { name = name
         , memo = memo
         , tags = tags
+        , importance = importance
         , deadline = into deadline
         , status = enrichStatus status
         }

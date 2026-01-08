@@ -21,13 +21,14 @@ logMsg :: (MonadLog m) => Text -> m ()
 logMsg = tell . into . L.singleton . ("[I] " <>) . (<> "\n")
 
 renderTaskDetail :: TimeZone -> TaskDetail -> Text
-renderTaskDetail tz TaskDetail{name, status, deadline, tags, memo} =
+renderTaskDetail tz TaskDetail{name, status, deadline, tags, memo, importance} =
     T.unlines
-        [ "  name:     " <> name
-        , "  status:   " <> into (show status)
-        , "  deadline: " <> renderDeadline tz deadline
-        , "  tags:     " <> renderTags False tags
-        , "  memo:     " <> if T.null memo then "N/A" else memo
+        [ "  name:       " <> name
+        , "  status:     " <> into (show status)
+        , "  deadline:   " <> renderDeadline tz deadline
+        , "  importance: " <> into (show importance)
+        , "  tags:       " <> renderTags False tags
+        , "  memo:       " <> if T.null memo then "N/A" else memo
         ]
 
 renderTaskSummary :: TaskDetail -> Text

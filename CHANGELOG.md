@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+- Added importance as a task component.
+- Added importance range filtering to list and delete subcommands.
+
 _No unreleased changes yet._
 
 ## [2.1.0] - 2026-01-06

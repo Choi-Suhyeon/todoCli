@@ -13,6 +13,7 @@ data DomainError
     | TaskNotFound
     | InvalidDeadline LocalTime LocalTime
     | TaskIdExhausted
+    | ImportanceOutOfRange
 
 instance Show DomainError where
     show EmptyTitle = "Title must not be empty"
@@ -23,3 +24,4 @@ instance Show DomainError where
             (iso8601Show c)
             (iso8601Show v)
     show TaskIdExhausted = "No available task ID: maximum capacity reached"
+    show ImportanceOutOfRange = "Importance value is out of valid range"

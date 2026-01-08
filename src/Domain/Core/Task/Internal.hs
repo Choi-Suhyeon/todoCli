@@ -37,6 +37,7 @@ data EntryCreation = EntryCreation
     , memo :: !Text
     , tags :: !(HashSet Text)
     , deadline :: !EntryDeadline
+    , importance :: !Word
     }
     deriving (Show)
 
@@ -46,6 +47,7 @@ data EntryPatch = EntryPatch
     , tags :: !(Maybe (HashSet Text))
     , deadline :: !(Maybe EntryDeadline)
     , status :: !(Maybe EntryStatus)
+    , importance :: !(Maybe Word)
     }
     deriving (Show)
 
@@ -80,6 +82,7 @@ data TaskBasic = TaskBasic
     , tags :: !(HashSet Text)
     , status :: !TaskBasicStatus
     , deadline :: TaskBasicDeadline
+    , importance :: Word
     }
     deriving (Show)
 
@@ -117,7 +120,10 @@ instance Ord TaskBasicDeadline where
 
 mkTask :: TimeZone -> UTCTime -> EntryCreation -> Either DomainError Task
 mkTask tz now EntryCreation{..}
-    | EBound d <- deadline, Left e <- validateDeadline tz now d = Left e
+    | EBound d <- deadline
+    , Left e <- validateDeadline tz now d =
+        Left e
+    | Left e <- validateImportance importance = Left e
     | otherwise =
         Right
             Task
@@ -125,6 +131,7 @@ mkTask tz now EntryCreation{..}
                 , memo = into memo
                 , tags = into tags
                 , deadline = into deadline
+                , importance = into importance
                 , status = Undone
                 }
 
@@ -134,14 +141,18 @@ modifyTask tz now entry task
     | Just (EBound d) <- entry.deadline
     , Left e <- validateDeadline tz now d =
         Left e
+    | Just w <- entry.importance
+    , Left e <- validateImportance w =
+        Left e
     | otherwise =
         Right
             Task
-                { name = fromMaybe task.name $ into <$> entry.name
-                , memo = fromMaybe task.memo $ into <$> entry.memo
-                , tags = fromMaybe task.tags $ into <$> entry.tags
-                , deadline = fromMaybe task.deadline (into <$> entry.deadline)
+                { name = maybe task.name into entry.name
+                , memo = maybe task.memo into entry.memo
+                , tags = maybe task.tags into entry.tags
                 , status = maybe task.status into entry.status
+                , deadline = maybe task.deadline into entry.deadline
+                , importance = maybe task.importance into entry.importance
                 }
 
 toTaskBasic :: Task -> TaskBasic
@@ -152,6 +163,7 @@ toTaskBasic Task{..} =
         , tags = into tags
         , status = into status
         , deadline = into deadline
+        , importance = into importance
         }
 
 validateDeadline :: TimeZone -> UTCTime -> UTCTime -> Either DomainError ()
@@ -163,3 +175,9 @@ validateDeadline tz now dd
             ddL = utcToLocalTime tz dd
          in
             Left $ InvalidDeadline nowL ddL
+
+validateImportance :: Word -> Either DomainError ()
+validateImportance =
+    bool (Left ImportanceOutOfRange) (Right ())
+        . liftA2 (&&) (>= minBound) (<= maxBound)
+        . into @TaskImportance

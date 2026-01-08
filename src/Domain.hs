@@ -25,9 +25,11 @@ module Domain
     , markTask
     , deleteTasks
     , getTaskDetails
+    , getTasksWithinImportanceRange
     ) where
 
 import Data.HashSet (HashSet)
+import Data.Interval (Interval, member)
 import Data.Text (Text)
 
 import Data.HashSet qualified as HS
@@ -102,6 +104,7 @@ markTask s tid = do
                     , memo = Nothing
                     , tags = Nothing
                     , deadline = Nothing
+                    , importance = Nothing
                     , status = Just s
                     }
 
@@ -155,12 +158,14 @@ getDueTasks :: (MonadEnv m, MonadRegistry m) => m (HashSet TaskId)
 getDueTasks = ask >>= \Env{now} -> get >>= pure . C.getTasksUndoneAnd (isDue now)
 
 getTasksByNameRegex :: (MonadRegistry m) => Text -> m (HashSet TaskId)
-getTasksByNameRegex pattern =
-    get
-        >>= pure
-        . C.getTasksMatching (\TaskBasic{name} -> matchTest compiled (into @Text name))
+getTasksByNameRegex pattern = get >>= pure . C.getTasksMatching (matchTest compiled . into @Text . (.name))
   where
-    compiled = makeRegex pattern :: Regex
+    compiled :: Regex
+    compiled = makeRegex pattern
 
 getTasksWithAllTags :: (MonadRegistry m) => HashSet Text -> m (HashSet TaskId)
 getTasksWithAllTags tags = get >>= pure . C.getTasksWithAllTags tags
+
+getTasksWithinImportanceRange
+    :: (MonadRegistry m) => Interval Word -> m (HashSet TaskId)
+getTasksWithinImportanceRange range = get >>= pure . C.getTasksMatching ((`member` range) . (.importance))

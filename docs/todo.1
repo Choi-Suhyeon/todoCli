@@ -41,6 +41,44 @@ A maximum of ten tags may be provided.
 Duplicate tags are ignored.
 .IP \(bu 2
 Tag order is not significant.
+.SS Importance
+The \f[CR]IMP.\f[R] field in \f[CR]add\f[R] and \f[CR]edit\f[R] commands
+accepts an integer from 1 to 9, where higher values indicate greater
+importance.
+.PP
+Aliases:
+.IP \(bu 2
+\f[CR]low\f[R] = 2
+.IP \(bu 2
+\f[CR]default\f[R] = 4
+.IP \(bu 2
+\f[CR]important\f[R] = 6
+.IP \(bu 2
+\f[CR]critical\f[R] = 8
+.PP
+If the importance option is not specified, it defaults to
+\f[CR]default\f[R] (= 4).
+.PP
+The \f[CR]list\f[R] and \f[CR]delete\f[R] commands support filtering by
+importance range using the \f[CR]..\f[R] separator: \- Format:
+\f[CR]<lower>..<upper>\f[R] \- Both bounds accept either a number (1\-9)
+or an alias.
+\- Either or both bounds may be omitted: \- Omitting the lower bound
+defaults to the minimum value (1) \- Omitting the upper bound defaults
+to the maximum value (9) \- The range is \f[B]inclusive\f[R] on both
+ends (closed interval).
+.PP
+Examples:
+.IP \(bu 2
+\f[CR]2..6\f[R] \(em tasks with importance from 2 to 6
+.IP \(bu 2
+\f[CR]low..8\f[R] \(em equivalent to \f[CR]2..8\f[R]
+.IP \(bu 2
+\f[CR]..5\f[R] \(em tasks with importance up to 5
+.IP \(bu 2
+\f[CR]6..\f[R] \(em tasks with importance 6 or higher
+.IP \(bu 2
+\f[CR]..\f[R] \(em all tasks (no filtering)
 .SS Dates and Time
 The \f[CR]DEADLINE\f[R] field accepts either a date or a full ISO\-8601
 \f[B]local\f[R] datetime.
@@ -61,9 +99,14 @@ All values are interpreted as local time.
 .SS Status
 The Statuses that may be designated differ by command.
 .PP
-allowed statuses: \- list: \f[CR]done\f[R], \f[CR]undone\f[R],
-\f[CR]due\f[R], \f[CR]overdue\f[R] \- mark: \f[CR]done\f[R],
-\f[CR]undone\f[R] \- delete: \f[CR]done\f[R], \f[CR]overdue\f[R]
+allowed statuses:
+.IP \(bu 2
+list: \f[CR]done\f[R], \f[CR]undone\f[R], \f[CR]due\f[R],
+\f[CR]overdue\f[R]
+.IP \(bu 2
+mark: \f[CR]done\f[R], \f[CR]undone\f[R]
+.IP \(bu 2
+delete: \f[CR]done\f[R], \f[CR]overdue\f[R]
 .SS Target Selection
 Commands such as \f[CR]edit\f[R], \f[CR]mark\f[R], and \f[CR]delete\f[R]
 require selecting one or more target tasks.

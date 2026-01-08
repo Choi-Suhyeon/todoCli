@@ -104,6 +104,7 @@ library
     , bytestring
     , cereal
     , containers
+    , data-interval
     , directory
     , file-embed
     , filepath
@@ -111,6 +112,7 @@ library
     , mtl
     , optparse-applicative
     , regex-tdfa
+    , split
     , template-haskell
     , text
     , time
@@ -166,6 +168,7 @@ executable todo
     , bytestring
     , cereal
     , containers
+    , data-interval
     , directory
     , file-embed
     , filepath
@@ -173,6 +176,7 @@ executable todo
     , mtl
     , optparse-applicative
     , regex-tdfa
+    , split
     , template-haskell
     , text
     , time

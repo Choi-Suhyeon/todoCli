@@ -2,9 +2,11 @@
 
 module CliParser (module CliParser.Options, parseOpts) where
 
+import Control.Arrow ((>>>))
 import Data.ByteString (ByteString)
 import Data.FileEmbed (embedFile)
 import Data.HashSet (HashSet)
+import Data.Interval (Extended (..), Interval, (<=..<=))
 import Data.Text (Text)
 import Data.Time.Calendar (Day (..))
 import Data.Time.Format.ISO8601
@@ -17,6 +19,8 @@ import Data.Version (showVersion)
 import Options.Applicative
 
 import Data.HashSet qualified as HS
+import Data.List qualified as L
+import Data.List.Split qualified as LS
 import Data.Text qualified as T
 import Data.Text.Encoding qualified as TE
 
@@ -95,7 +99,7 @@ pCommand = hsubparser $ cAdd <> cList <> cEdit <> cMark <> cDelete
             $ progDesc "Delete all tasks or delete selectively by filters"
 
 pAddCommand :: Parser AddCommand
-pAddCommand = AddCommand <$> pName <*> pDeadline <*> pMemo <*> pTags
+pAddCommand = AddCommand <$> pName <*> pDeadline <*> pMemo <*> pTags <*> pImportance
   where
     pName :: Parser Text
     pName =
@@ -133,17 +137,26 @@ pAddCommand = AddCommand <$> pName <*> pDeadline <*> pMemo <*> pTags
             <> help "Space-separated tags (maximum 10)"
             <> value HS.empty
 
+    pImportance :: Parser Word
+    pImportance =
+        option importanceReader
+            $ short 'i'
+            <> long "importance"
+            <> metavar "IMP."
+            <> help "Importance ranging from 1 to 9 (default: 4)"
+            <> value 4
+
 pListCommand :: Parser ListCommand
-pListCommand = ListCommand <$> pTags <*> pStatus
+pListCommand = ListCommand <$> pTags <*> pStatus <*> pImportance
   where
-    pTags :: Parser (HashSet Text)
+    pTags :: Parser (Maybe (HashSet Text))
     pTags =
-        option textSetReader
+        optional
+            $ option textSetReader
             $ short 't'
             <> long "tags"
             <> metavar "TAGS"
             <> help "Filter by tags (space-separated)"
-            <> value HS.empty
 
     pStatus :: Parser (Maybe ListStatus)
     pStatus =
@@ -154,8 +167,24 @@ pListCommand = ListCommand <$> pTags <*> pStatus
             <> metavar "STATUS"
             <> help "Filter by status (done, undone, due, overdue)"
 
+    pImportance :: Parser (Maybe (Interval Word))
+    pImportance =
+        optional
+            $ option importanceRangeReader
+            $ short 'i'
+            <> long "importance"
+            <> metavar "IMP."
+            <> help "Filter by importance range"
+
 pEditCommand :: Parser EditCommand
-pEditCommand = EditCommand <$> pTgtName <*> pName <*> pMemo <*> pTags <*> pDeadline
+pEditCommand =
+    EditCommand
+        <$> pTgtName
+        <*> pName
+        <*> pMemo
+        <*> pTags
+        <*> pDeadline
+        <*> pImportance
   where
     pTgtName :: Parser Text
     pTgtName = strArgument $ metavar "NAME_PATTERN"
@@ -217,6 +246,15 @@ pEditCommand = EditCommand <$> pTgtName <*> pName <*> pMemo <*> pTags <*> pDeadl
                 <> help
                     "New deadline (YYYY-MM-DD or ISO 8601 datetime; time defaults to 23:59:59)"
 
+    pImportance :: Parser (Maybe Word)
+    pImportance =
+        optional
+            $ option importanceReader
+            $ short 'i'
+            <> long "importance"
+            <> metavar "IMP."
+            <> help "Importance ranging from 1 to 9 (default: 4)"
+
 pMarkCommand :: Parser MarkCommand
 pMarkCommand =
     hsubparser
@@ -235,7 +273,7 @@ pDeleteCommand =
         <> metavar "COMMAND"
   where
     pDelBy :: Parser DeleteCommand
-    pDelBy = DelBy <$> pByName <*> pByTags <*> pByStatus
+    pDelBy = DelBy <$> pByName <*> pByTags <*> pByStatus <*> pByImportance
 
     pByName :: Parser (Maybe Text)
     pByName =
@@ -263,6 +301,15 @@ pDeleteCommand =
             <> long "status"
             <> metavar "STATUS"
             <> help "Filter by task status (done, overdue)"
+
+    pByImportance :: Parser (Maybe (Interval Word))
+    pByImportance =
+        optional
+            $ option importanceRangeReader
+            $ short 'i'
+            <> long "importance"
+            <> metavar "IMP."
+            <> help "Filter by task importance"
 
 nameReader :: ReadM Text
 nameReader = maybeReader $ liftA2 (bool Nothing) (Just . T.pack) ((<= 30) . length)
@@ -300,3 +347,40 @@ textSetReader =
 
     uniqueWords :: Text -> HashSet Text
     uniqueWords = HS.filter (not . T.null) . HS.fromList . T.splitOn " "
+
+importanceReader :: ReadM Word
+importanceReader = maybeReader parseImportanceSyntax
+
+importanceRangeReader :: ReadM (Interval Word)
+importanceRangeReader = maybeReader parseRange
+  where
+    parseRange :: String -> Maybe (Interval Word)
+    parseRange =
+        LS.splitOn ".." >>> \case
+            [l, u] ->
+                (<=..<=)
+                    <$> parseBound NegInf (strip l)
+                    <*> parseBound PosInf (strip u)
+            _ -> Nothing
+      where
+        parseBound :: Extended Word -> String -> Maybe (Extended Word)
+        parseBound defaultVal "" = Just defaultVal
+        parseBound _ s = Finite <$> parseImportanceSyntax s
+
+        strip = L.dropWhile isSpace . L.dropWhileEnd isSpace
+
+parseImportanceSyntax :: String -> Maybe Word
+parseImportanceSyntax =
+    bool
+        <$> readAlias
+        . map toLower
+        <*> Just
+        . read
+        <*> all isDigit
+  where
+    readAlias :: String -> Maybe Word
+    readAlias "low" = Just 2
+    readAlias "default" = Just 4
+    readAlias "important" = Just 6
+    readAlias "critical" = Just 8
+    readAlias _ = Nothing

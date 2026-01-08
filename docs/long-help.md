@@ -22,6 +22,35 @@ Each command may define define its own flags, but several input rules or concept
 - Duplicate tags are ignored.
 - Tag order is not significant.
 
+### Importance
+
+The `IMP.` field in `add` and `edit` commands accepts an integer from 1 to 9, where higher values indicate greater importance.
+
+Aliases:
+
+- `low` = 2
+- `default` = 4
+- `important` = 6
+- `critical` = 8
+
+If the importance option is not specified, it defaults to `default` (= 4).
+
+The `list` and `delete` commands support filtering by importance range using the `..` separator:
+- Format: `<lower>..<upper>`
+- Both bounds accept either a number (1-9) or an alias.
+- Either or both bounds may be omitted:
+  - Omitting the lower bound defaults to the minimum value (1)
+  - Omitting the upper bound defaults to the maximum value (9)
+- The range is **inclusive** on both ends (closed interval).
+
+Examples:
+
+- `2..6` — tasks with importance from 2 to 6
+- `low..8` — equivalent to `2..8`
+- `..5` — tasks with importance up to 5
+- `6..` — tasks with importance 6 or higher
+- `..` — all tasks (no filtering)
+
 ### Dates and Time
 The `DEADLINE` field accepts either a date or a full ISO-8601 **local** datetime.
 
@@ -38,6 +67,7 @@ Additional rules:
 The Statuses that may be designated differ by command.
 
 allowed statuses:
+
 - list: `done`, `undone`, `due`, `overdue`
 - mark: `done`, `undone`
 - delete: `done`, `overdue`

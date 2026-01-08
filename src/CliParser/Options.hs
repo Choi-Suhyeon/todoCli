@@ -14,6 +14,7 @@ module CliParser.Options
     ) where
 
 import Data.HashSet (HashSet)
+import Data.Interval (Interval)
 import Data.Text (Text)
 import Data.Time.LocalTime (LocalTime)
 
@@ -40,6 +41,7 @@ data AddCommand = AddCommand
     , deadline :: OptionDeadline
     , memo :: Text
     , tags :: HashSet Text
+    , importance :: Word
     }
     deriving (Show)
 
@@ -47,8 +49,9 @@ data OptionDeadline = Boundless | Bound LocalTime
     deriving (Show)
 
 data ListCommand = ListCommand
-    { tags :: HashSet Text
+    { tags :: Maybe (HashSet Text)
     , status :: Maybe ListStatus
+    , importance :: Maybe (Interval Word)
     }
     deriving (Show)
 
@@ -58,6 +61,7 @@ data EditCommand = EditCommand
     , memo :: Maybe EditMemo
     , tags :: Maybe EditTags
     , deadline :: Maybe OptionDeadline
+    , importance :: Maybe Word
     }
     deriving (Show)
 
@@ -76,6 +80,7 @@ data DeleteCommand
         { byName :: Maybe Text
         , byTags :: Maybe (HashSet Text)
         , byStatus :: Maybe DeleteStatus
+        , byImportance :: Maybe (Interval Word)
         }
     deriving (Show)
 

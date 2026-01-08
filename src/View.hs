@@ -22,6 +22,7 @@ data ColNameTaskDetail
     | CNTags
     | CNName
     | CNMemo
+    | CNImportance
     deriving (Eq)
 
 instance Show ColNameTaskDetail where
@@ -30,6 +31,7 @@ instance Show ColNameTaskDetail where
     show CNTags = "Tags"
     show CNName = "Name"
     show CNMemo = "Memo"
+    show CNImportance = "IMP."
 
 initTaskDetailRenderConfig
     :: TimeZone -> RenderConfig ColNameTaskDetail TaskDetail
@@ -39,6 +41,7 @@ initTaskDetailRenderConfig tz =
         , cellMinWidth = 6
         , cols =
             [ Column CNStatus 1 False renderStatus
+            , Column CNImportance 1 False renderImportance
             , Column CNName 2 False renderName
             , Column CNDeadline 2 True renderDeadline
             , Column CNTags 2 True renderTags
@@ -69,11 +72,15 @@ initTaskDetailRenderConfig tz =
         | T.null m = "N/A"
         | otherwise = into m
 
+    renderImportance :: TaskDetail -> String
+    renderImportance TaskDetail{importance = i} = show i
+
 sortTaskDetails :: [TaskDetail] -> [TaskDetail]
 sortTaskDetails =
     sortBy
-        $ comparing (\t -> t.status)
-        <> comparing (Down . (\t -> t.deadline))
-        <> comparing (length . (\t -> t.tags))
-        <> comparing (T.length . (\t -> t.name))
-        <> comparing (T.length . (\t -> t.memo))
+        $ comparing (.status)
+        <> comparing (.importance)
+        <> comparing (Down . (.deadline))
+        <> comparing (length . (.tags))
+        <> comparing (T.length . (.name))
+        <> comparing (T.length . (.memo))

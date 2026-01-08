@@ -9,6 +9,7 @@ dependencies:
   - bytestring
   - cereal
   - containers
+  - data-interval
   - directory
   - file-embed
   - filepath
@@ -16,6 +17,7 @@ dependencies:
   - mtl
   - optparse-applicative
   - regex-tdfa
+  - split
   - template-haskell
   - text
   - time
