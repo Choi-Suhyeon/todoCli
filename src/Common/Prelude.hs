@@ -20,6 +20,7 @@ module Common.Prelude
     , module Data.Traversable
     , module Witch
     , maybeToEither
+    , liftSafeIO
     , tee
     , teeM
     , (>!)
@@ -27,6 +28,7 @@ module Common.Prelude
     ) where
 
 import Control.Applicative
+import Control.Exception (Exception, try)
 import Control.Monad
 import Control.Monad.Except
 import Control.Monad.Reader
@@ -53,6 +55,9 @@ infixr 9 .:
 maybeToEither :: a -> Maybe b -> Either a b
 maybeToEither _ (Just b) = Right b
 maybeToEither a Nothing = Left a
+
+liftSafeIO :: (Exception e, MonadIO m) => IO a -> m (Either e a)
+liftSafeIO = liftIO . try
 
 tee :: (Functor f) => (a -> f b) -> a -> f a
 tee = liftA2 (<$) id

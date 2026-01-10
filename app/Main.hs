@@ -2,15 +2,14 @@
 
 module Main (main) where
 
-import Control.Arrow ((>>>))
-import Control.Exception (ErrorCall, evaluate, try)
 import Data.HashSet (HashSet)
-import Data.List (foldl1')
+import Data.List.NonEmpty (nonEmpty)
 import Data.Text (Text)
 import Data.Time.Clock (getCurrentTime)
 import Data.Time.LocalTime (getCurrentTimeZone, localTimeToUTC)
 import System.Exit (exitFailure, exitSuccess)
 import System.IO (stderr)
+import System.IO.Error (ioeGetErrorType, isDoesNotExistErrorType)
 
 import Data.HashSet qualified as HS
 import Data.Text.IO qualified as TIO
@@ -90,23 +89,24 @@ main :: IO ()
 main = do
     opts <- parseOpts
     env <- initEnv
-    reg <- loadRegistry
-    (intermediate, logs) <- main' opts & runApp env reg
-    result <-
-        runExceptT
-            $ ExceptT (pure intermediate)
-            >>= writeData
-            . serialize
-            . UsingCereal
-            . snd
+    reg <-
+        loadRegistryWithBackup env >>= \case
+            Right r -> pure r
+            Left e -> do
+                TIO.hPutStr stderr (into (show e))
+                exitFailure
+
+    (result, logs) <- main' opts & runApp env reg
+    result' <-
+        runExceptT $ writeData . serialize . UsingCereal . snd =<< ExceptT (pure result)
 
     let
         printLogsEndedWith :: Maybe Text -> IO ()
         printLogsEndedWith = TIO.hPutStr stderr . foldMap id . (logs <>) . into . maybeToList
 
-    case result of
+    case result' of
         Right () -> printLogsEndedWith Nothing *> exitSuccess
-        Left e -> printLogsEndedWith (show e & into & (<> "\n") & Just) *> exitFailure
+        Left e -> printLogsEndedWith (Just $ (<> "\n") $ into $ show e) *> exitFailure
   where
     initEnv :: IO Env
     initEnv = do
@@ -115,9 +115,18 @@ main = do
 
         pure Env{now, tz}
 
-    loadRegistry :: (MonadIO m) => m TodoRegistry
-    loadRegistry =
-        fromRight initTodoRegistry <$> runExceptT do
+    loadRegistryWithBackup :: Env -> IO (Either AppError TodoRegistry)
+    loadRegistryWithBackup env =
+        loadRegistry >>= \case
+            r@(Right _) -> pure r
+            Left (StorageE (SerializationE _)) -> do
+                b <- runExceptT $ backupData env.now
+                pure $ initTodoRegistry <$ b
+            e@(Left _) -> pure e
+
+    loadRegistry :: (MonadIO m) => m (Either AppError TodoRegistry)
+    loadRegistry = do
+        result <- runExceptT do
             raw <- readData
             UsingCereal reg <-
                 raw
@@ -125,18 +134,20 @@ main = do
                     & first (into @StorageError)
                     & liftEitherInto @AppError
 
-            let
-                adjust =
-                    bool rebuildIds pure
-                        $ and
-                        $ map
-                            ($ reg)
-                            [ checkIdInvariant
-                            , checkTagIndexInvariant
-                            , checkStatusIndexInvariant
-                            ]
-
             liftEitherInto $ adjust reg
+
+        pure case result of
+            reg@(Right _) -> reg
+            err@(Left (EffectE (ReadFailed e)))
+                | isDoesNotExistErrorType $ ioeGetErrorType e -> Right initTodoRegistry
+                | otherwise -> err
+            err@(Left _) -> err
+      where
+        adjust :: TodoRegistry -> Either DomainError TodoRegistry
+        adjust = liftA3 bool rebuildIds pure (and . (<$> invariants) . (&))
+
+        invariants :: [TodoRegistry -> Bool]
+        invariants = [checkIdInvariant, checkTagIndexInvariant, checkStatusIndexInvariant]
 
 main' :: Options -> App ()
 main' Options{optCommand, verbose} = censor (bool (const mempty) id verbose) $ runCommand optCommand
@@ -219,15 +230,16 @@ runDeleteCommand DelBy{byName, byTags, byStatus, byImportance} = do
     tasks <-
         [tasks1, tasks2, tasks3, tasks4]
             & catMaybes
-            & foldl1' HS.intersection
-            & (evaluate >>> try @ErrorCall >>> liftIO >=> handleResult)
+            & nonEmpty
+            & fmap (foldr1 HS.intersection)
+            & handleResult
 
     deleteTasks tasks
   where
-    handleResult :: Either ErrorCall (HashSet TaskId) -> App (HashSet TaskId)
-    handleResult (Left _) = throwError $ ParserE NoOptionsProvided
-    handleResult (Right []) = throwError $ ParserE DeletionTargetNotFound
-    handleResult (Right xs) = pure xs
+    handleResult :: Maybe (HashSet TaskId) -> App (HashSet TaskId)
+    handleResult Nothing = throwError $ ParserE NoOptionsProvided
+    handleResult (Just []) = throwError $ ParserE DeletionTargetNotFound
+    handleResult (Just xs) = pure xs
 
 getUniqueTarget :: (MonadError AppError m, MonadRegistry m) => Text -> m TaskId
 getUniqueTarget = getTasksByNameRegex >=> getFromSingleton

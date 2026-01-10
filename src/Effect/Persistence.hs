@@ -1,7 +1,10 @@
-module Effect.Persistence (readData, writeData) where
+module Effect.Persistence (readData, writeData, backupData) where
 
-import Control.Exception (Exception, IOException, bracketOnError, try)
+import Control.Arrow ((>>>))
+import Control.Exception (IOException, bracketOnError)
 import Data.ByteString (ByteString, hPutStr, readFile)
+import Data.Time.Clock (UTCTime)
+import Data.Time.Format.ISO8601 (iso8601Show)
 import System.Directory
     ( XdgDirectory (..)
     , createDirectoryIfMissing
@@ -20,9 +23,8 @@ import Effect.Error
 readData :: (MonadEffectError e m, MonadIO m) => m ByteString
 readData =
     getDataDirectory
-        >>= (liftSafeIO @IOException . readFile)
-        . (</> dataFileName)
-        >>= liftEitherAs ReadFailed
+        >>= ((</> dataFileName) >>> readFile >>> liftSafeIO @IOException)
+        >>= liftEitherWith ReadFailed
 
 writeData :: (MonadEffectError e m, MonadIO m) => ByteString -> m ()
 writeData bs = do
@@ -42,16 +44,31 @@ writeData bs = do
             when exists $ removeFile fullPath
             renameFile tmp fullPath
 
-    liftEitherAs WriteFailed result
+    liftEitherWith WriteFailed result
+
+backupData :: (MonadEffectError e m, MonadIO m) => UTCTime -> m ()
+backupData now = do
+    dir <- getDataDirectory
+
+    let
+        oldFilePath = dir </> dataFileName
+        newFilePath = dir </> nowStr <> "_" <> dataFileName <.> "bak"
+
+    result <- liftSafeIO @IOException $ renameFile oldFilePath newFilePath
+
+    liftEitherAs BackupFailed result
+  where
+    nowStr :: String
+    nowStr = map (replaceToDot ":-") $ iso8601Show now
+
+    replaceToDot :: String -> Char -> Char
+    replaceToDot targets = bool '.' <$> id <*> (`notElem` targets)
 
 getDataDirectory :: (MonadEffectError e m, MonadIO m) => m FilePath
 getDataDirectory =
     liftSafeIO @IOException
         (getXdgDirectory XdgData dataDirectoryName >! createDirectoryIfMissing True)
         >>= liftEitherAs GettingDataDirectoryFailed
-
-liftSafeIO :: (Exception e, MonadIO m) => IO a -> m (Either e a)
-liftSafeIO = liftIO . try
 
 dataDirectoryName :: String
 dataDirectoryName = "todo"
