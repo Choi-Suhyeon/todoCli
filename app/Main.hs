@@ -2,6 +2,7 @@
 
 module Main (main) where
 
+import Control.Arrow ((>>>))
 import Data.HashSet (HashSet)
 import Data.List.NonEmpty (nonEmpty)
 import Data.Text (Text)
@@ -10,6 +11,7 @@ import Data.Time.LocalTime (getCurrentTimeZone, localTimeToUTC)
 import System.Exit (exitFailure, exitSuccess)
 import System.IO (stderr)
 import System.IO.Error (ioeGetErrorType, isDoesNotExistErrorType)
+import Text.Printf (printf)
 
 import Data.HashSet qualified as HS
 import Data.Text.IO qualified as TIO
@@ -164,7 +166,7 @@ runAddCommand AddCommand{name, deadline, memo, tags, importance} = do
     optionDeadlineToEntryDeadline deadline >>= \utcDeadline -> addTask EntryCreation{name, memo, tags, importance, deadline = utcDeadline}
 
 runListCommand :: ListCommand -> App ()
-runListCommand ListCommand{tags, status, importance} = do
+runListCommand ListCommand{tags, status, importance, shouldReverse} = do
     tz <- asks (.tz)
     allTasks <- getAllTasks
     tasks1 <- traverse getTasksWithAllTags tags
@@ -181,10 +183,24 @@ runListCommand ListCommand{tags, status, importance} = do
             & foldl' HS.intersection allTasks
             & into
             & getTaskDetails
-            & fmap sortTaskDetails
+            & fmap (sortTaskDetails >>> bool id reverse shouldReverse)
 
-    liftIO . putStrLn $ renderTable (initTaskDetailRenderConfig tz) snapshots
-    pure ()
+    let
+        numOfSnapshots :: Int
+        numOfSnapshots = length snapshots
+
+        infoToShow :: String
+        infoToShow =
+            printf
+                "%d task%s (prio high at %s)\n"
+                numOfSnapshots
+                (bool "" "s" (numOfSnapshots > 1) :: String)
+                (bool "bottom" "top" shouldReverse :: String)
+
+        renderConfig :: TaskDetailRenderConfig
+        renderConfig = initTaskDetailRenderConfig tz infoToShow
+
+    liftIO . putStrLn $ renderTable renderConfig snapshots
 
 runEditCommand :: EditCommand -> App ()
 runEditCommand EditCommand{tgtName, name, deadline, memo, tags, importance} = do

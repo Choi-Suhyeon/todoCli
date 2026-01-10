@@ -9,8 +9,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Added
 - Added importance as a task component.
 - Added importance range filtering to list and delete subcommands.
+- Added `list --reverse` option.
 
-_No unreleased changes yet._
+### Changed
+- Adds version information to registry serialization. On deserialization failure, the existing data is backed up and a new registry is created.
+- Improved list status line to show priority orientation (`prio high at top/bottom`).
 
 ## [2.1.0] - 2026-01-06
 

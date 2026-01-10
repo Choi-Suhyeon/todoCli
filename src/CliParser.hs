@@ -147,7 +147,7 @@ pAddCommand = AddCommand <$> pName <*> pDeadline <*> pMemo <*> pTags <*> pImport
             <> value 4
 
 pListCommand :: Parser ListCommand
-pListCommand = ListCommand <$> pTags <*> pStatus <*> pImportance
+pListCommand = ListCommand <$> pTags <*> pStatus <*> pImportance <*> pShouldReverse
   where
     pTags :: Parser (Maybe (HashSet Text))
     pTags =
@@ -175,6 +175,13 @@ pListCommand = ListCommand <$> pTags <*> pStatus <*> pImportance
             <> long "importance"
             <> metavar "IMP."
             <> help "Filter by importance range"
+
+    pShouldReverse :: Parser Bool
+    pShouldReverse =
+        switch
+            $ short 'r'
+            <> long "reverse"
+            <> help "Reverse the order of the list"
 
 pEditCommand :: Parser EditCommand
 pEditCommand =

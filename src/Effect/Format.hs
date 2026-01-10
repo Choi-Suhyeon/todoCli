@@ -22,6 +22,7 @@ data RenderConfig a b = RenderConfig
     { cols :: [Column a b]
     , vSpace :: Int
     , cellMinWidth :: Int
+    , moreInfo :: String
     }
 
 renderTable :: (Eq a, Show a) => RenderConfig a b -> [b] -> String
@@ -35,8 +36,7 @@ renderTableWithout
     -> [b]
     -> String
 renderTableWithout exceptions RenderConfig{..} targets = maybe "" renderWithInfo do
-    filteredCols <-
-        NE.nonEmpty $ filter (\Column{colName} -> colName `notElem` exceptions) cols
+    filteredCols <- NE.nonEmpty $ filter ((`notElem` exceptions) . (.colName)) cols
 
     let
         boxCols = NE.map makeColumnWithTitle filteredCols
@@ -47,10 +47,7 @@ renderTableWithout exceptions RenderConfig{..} targets = maybe "" renderWithInfo
     pure completeBox
   where
     renderWithInfo :: Box -> String
-    renderWithInfo box =
-        render box
-            <> show numOfTasks
-            <> bool " tasks\n" " task\n" (numOfTasks < 2)
+    renderWithInfo = (<> moreInfo) . render
 
     makeColumnWithTitle :: Column a b -> Box
     makeColumnWithTitle Column{..} =
@@ -58,9 +55,6 @@ renderTableWithout exceptions RenderConfig{..} targets = maybe "" renderWithInfo
       where
         colNameToBox = text . bool id (ensureMinWidth cellMinWidth) needsMinWidth . show
         dataToBox = vsep vSpace left . map (text . extractColStr)
-
-    numOfTasks :: Int
-    numOfTasks = length targets
 
 ensureMinWidth :: Int -> String -> String
 ensureMinWidth minWidth = liftA2 (<>) id ((`replicate` ' ') . (minWidth -) . length)

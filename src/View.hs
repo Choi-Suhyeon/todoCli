@@ -1,4 +1,4 @@
-module View (initTaskDetailRenderConfig, sortTaskDetails) where
+module View (TaskDetailRenderConfig, initTaskDetailRenderConfig, sortTaskDetails) where
 
 import Data.List (sort, sortBy)
 import Data.Ord (Down (..), comparing)
@@ -33,11 +33,13 @@ instance Show ColNameTaskDetail where
     show CNMemo = "Memo"
     show CNImportance = "IMP."
 
-initTaskDetailRenderConfig
-    :: TimeZone -> RenderConfig ColNameTaskDetail TaskDetail
-initTaskDetailRenderConfig tz =
+type TaskDetailRenderConfig = RenderConfig ColNameTaskDetail TaskDetail
+
+initTaskDetailRenderConfig :: TimeZone -> String -> TaskDetailRenderConfig
+initTaskDetailRenderConfig tz moreInfo =
     RenderConfig
-        { vSpace = 0
+        { moreInfo
+        , vSpace = 0
         , cellMinWidth = 6
         , cols =
             [ Column CNStatus 1 False renderStatus

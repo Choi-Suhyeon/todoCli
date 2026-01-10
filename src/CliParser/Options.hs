@@ -52,6 +52,7 @@ data ListCommand = ListCommand
     { tags :: Maybe (HashSet Text)
     , status :: Maybe ListStatus
     , importance :: Maybe (Interval Word)
+    , shouldReverse :: Bool
     }
     deriving (Show)
 
