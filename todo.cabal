@@ -35,6 +35,9 @@ library
       Common
       Common.AbstractError
       Common.Env
+      Common.Env.Config
+      Common.Env.Config.Error
+      Common.Env.Runtime
       Common.Prelude
       Common.Regex
       Common.Serialization
@@ -116,6 +119,7 @@ library
     , template-haskell
     , text
     , time
+    , tomland
     , transformers
     , unordered-containers
     , witch
@@ -181,6 +185,7 @@ executable todo
     , text
     , time
     , todo
+    , tomland
     , transformers
     , unordered-containers
     , witch

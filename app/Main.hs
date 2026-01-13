@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -Wno-orphans #-}
+{-# LANGUAGE ImplicitParams #-}
 
 module Main (main) where
 
@@ -53,6 +54,16 @@ data AppError
     | EffectE EffectError
     | ParserE ParserError
     | StorageE StorageError
+    | ConfigE ConfigError
+
+instance From DomainError AppError where
+    from = DomainE
+
+instance From EffectError AppError where
+    from = EffectE
+
+instance From ConfigError AppError where
+    from = ConfigE
 
 data ParserError
     = MultipleTargetsError
@@ -80,17 +91,21 @@ instance Show AppError where
     show (EffectE x) = "[E:System] " <> show x
     show (ParserE x) = "[E:Parser] " <> show x
     show (StorageE x) = "[E:Storage] " <> show x
-
-instance From DomainError AppError where
-    from = DomainE
-
-instance From EffectError AppError where
-    from = EffectE
+    show (ConfigE x) = "[E:Config] " <> show x
 
 main :: IO ()
 main = do
+    config <- loadConfig
+    runtime <- initRuntime
+
+    let
+        ?config = config
+
+    let
+        env :: Env
+        env = Env{ config, runtime }
+
     opts <- parseOpts
-    env <- initEnv
     reg <-
         loadRegistryWithBackup env >>= \case
             Right r -> pure r
@@ -110,19 +125,25 @@ main = do
         Right () -> printLogsEndedWith Nothing *> exitSuccess
         Left e -> printLogsEndedWith (Just $ (<> "\n") $ into $ show e) *> exitFailure
   where
-    initEnv :: IO Env
-    initEnv = do
+    initRuntime :: IO Runtime
+    initRuntime = do
         now <- getCurrentTime
         tz <- getCurrentTimeZone
 
-        pure Env{now, tz}
+        pure Runtime{now, tz}
+
+    loadConfig :: IO Config
+    loadConfig = pure . fromRight initConfig =<< runExceptT load
+      where
+        load :: ExceptT AppError IO Config
+        load = liftEitherInto . parseConfig =<< readConfig
 
     loadRegistryWithBackup :: Env -> IO (Either AppError TodoRegistry)
     loadRegistryWithBackup env =
         loadRegistry >>= \case
             r@(Right _) -> pure r
             Left (StorageE (SerializationE _)) -> do
-                b <- runExceptT $ backupData env.now
+                b <- runExceptT $ backupData env.runtime.now
                 pure $ initTodoRegistry <$ b
             e@(Left _) -> pure e
 
@@ -167,7 +188,7 @@ runAddCommand AddCommand{name, deadline, memo, tags, importance} = do
 
 runListCommand :: ListCommand -> App ()
 runListCommand ListCommand{tags, status, importance, shouldReverse} = do
-    tz <- asks (.tz)
+    tz <- asks (.runtime.tz)
     allTasks <- getAllTasks
     tasks1 <- traverse getTasksWithAllTags tags
     tasks2 <- traverse getTasksWithinImportanceRange importance
@@ -269,4 +290,4 @@ getFromSingleton = (. toList) \case
 optionDeadlineToEntryDeadline
     :: (MonadEnv m) => OptionDeadline -> m EntryDeadline
 optionDeadlineToEntryDeadline Boundless = pure EBoundless
-optionDeadlineToEntryDeadline (Bound d) = asks (.tz) >>= pure . EBound . (`localTimeToUTC` d)
+optionDeadlineToEntryDeadline (Bound d) = asks (.runtime.tz) >>= pure . EBound . (`localTimeToUTC` d)

@@ -57,6 +57,7 @@ let dependencies : List Text =
     , "template-haskell"
     , "text"
     , "time"
+    , "tomland"
     , "transformers"
     , "unordered-containers"
     , "witch"

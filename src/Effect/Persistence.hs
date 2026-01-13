@@ -1,6 +1,5 @@
-module Effect.Persistence (readData, writeData, backupData) where
+module Effect.Persistence (readData, readConfig, writeData, backupData) where
 
-import Control.Arrow ((>>>))
 import Control.Exception (IOException, bracketOnError)
 import Data.ByteString (ByteString, hPutStr, readFile)
 import Data.Time.Clock (UTCTime)
@@ -21,57 +20,93 @@ import Common.Prelude hiding (readFile)
 import Effect.Error
 
 readData :: (MonadEffectError e m, MonadIO m) => m ByteString
-readData =
-    getDataDirectory
-        >>= ((</> dataFileName) >>> readFile >>> liftSafeIO @IOException)
-        >>= liftEitherWith ReadFailed
+readData = readRaw getDataDirectory dataFileName
+
+readConfig :: (MonadEffectError e m, MonadIO m) => m ByteString
+readConfig = readRaw getConfigDirectory configFileName
 
 writeData :: (MonadEffectError e m, MonadIO m) => ByteString -> m ()
-writeData bs = do
-    dir <- getDataDirectory
-    result <- liftSafeIO @IOException $ bracketOnError
-        (openBinaryTempFile dir $ dataFileName <.> "tmp")
+writeData = writeRaw getDataDirectory dataFileName
+
+backupData :: (MonadEffectError e m, MonadIO m) => UTCTime -> m ()
+backupData = backupRaw getDataDirectory dataFileName
+
+-- private
+
+readRaw
+    :: (MonadEffectError e m, MonadIO m) => m FilePath -> String -> m ByteString
+readRaw mdir file = mdir >>= (`readRawAt` file)
+
+writeRaw
+    :: (MonadEffectError e m, MonadIO m) => m FilePath -> String -> ByteString -> m ()
+writeRaw mdir file bs = mdir >>= \dir -> writeRawAt dir file bs
+
+backupRaw
+    :: (MonadEffectError e m, MonadIO m) => m FilePath -> String -> UTCTime -> m ()
+backupRaw mdir file now = mdir >>= \dir -> backupRawAt dir file now
+
+getDataDirectory :: (MonadEffectError e m, MonadIO m) => m FilePath
+getDataDirectory = getDirectory XdgData directoryName GettingDataDirectoryFailed
+
+getConfigDirectory :: (MonadEffectError e m, MonadIO m) => m FilePath
+getConfigDirectory = getDirectory XdgConfig directoryName GettingConfigDirectoryFailed
+
+readRawAt
+    :: (MonadEffectError e m, MonadIO m) => FilePath -> String -> m ByteString
+readRawAt dir file =
+    liftEitherWith ReadFailed =<< liftSafeIO @IOException (readFile $ dir </> file)
+
+writeRawAt
+    :: (MonadEffectError e m, MonadIO m) => FilePath -> String -> ByteString -> m ()
+writeRawAt dir file bs =
+    liftEitherWith WriteFailed =<< liftSafeIO @IOException writeFileSafe
+  where
+    fullPath :: FilePath
+    fullPath = dir </> file
+
+    writeFileSafe :: IO ()
+    writeFileSafe = bracketOnError
+        (openBinaryTempFile dir $ file <.> "tmp")
         (liftA2 (*>) (hClose . snd) (removeFile . fst))
         \(tmp, h) -> do
             hPutStr h bs
             hClose h
-
-            let
-                fullPath = dir </> dataFileName
 
             exists <- doesFileExist fullPath
 
             when exists $ removeFile fullPath
             renameFile tmp fullPath
 
-    liftEitherWith WriteFailed result
-
-backupData :: (MonadEffectError e m, MonadIO m) => UTCTime -> m ()
-backupData now = do
-    dir <- getDataDirectory
-
-    let
-        oldFilePath = dir </> dataFileName
-        newFilePath = dir </> nowStr <> "_" <> dataFileName <.> "bak"
-
-    result <- liftSafeIO @IOException $ renameFile oldFilePath newFilePath
-
-    liftEitherAs BackupFailed result
+backupRawAt
+    :: (MonadEffectError e m, MonadIO m) => FilePath -> String -> UTCTime -> m ()
+backupRawAt dir file now =
+    liftEitherAs BackupFailed
+        =<< liftSafeIO @IOException (renameFile oldFilePath newFilePath)
   where
+    oldFilePath, newFilePath :: FilePath
+
+    oldFilePath = dir </> file
+    newFilePath = dir </> nowStr <> "_" <> file <.> "bak"
+
     nowStr :: String
     nowStr = map (replaceToDot ":-") $ iso8601Show now
 
     replaceToDot :: String -> Char -> Char
     replaceToDot targets = bool '.' <$> id <*> (`notElem` targets)
 
-getDataDirectory :: (MonadEffectError e m, MonadIO m) => m FilePath
-getDataDirectory =
+getDirectory
+    :: (MonadEffectError e m, MonadIO m)
+    => XdgDirectory -> String -> EffectError -> m FilePath
+getDirectory xdgDir dirName err =
     liftSafeIO @IOException
-        (getXdgDirectory XdgData dataDirectoryName >! createDirectoryIfMissing True)
-        >>= liftEitherAs GettingDataDirectoryFailed
+        (getXdgDirectory xdgDir dirName >! createDirectoryIfMissing True)
+        >>= liftEitherAs err
 
-dataDirectoryName :: String
-dataDirectoryName = "todo"
+directoryName :: String
+directoryName = "todo"
 
 dataFileName :: String
 dataFileName = "todo.dat"
+
+configFileName :: String
+configFileName = "config.toml"

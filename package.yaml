@@ -21,6 +21,7 @@ dependencies:
   - template-haskell
   - text
   - time
+  - tomland
   - transformers
   - unordered-containers
   - witch

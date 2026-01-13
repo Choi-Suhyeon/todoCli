@@ -1,4 +1,5 @@
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE ImplicitParams #-}
 
 module CliParser (module CliParser.Options, parseOpts) where
 
@@ -26,13 +27,13 @@ import Data.Text.Encoding qualified as TE
 
 import CliParser.Options
 import Common.Prelude
-import Common.Regex
+import Common
 import Paths_todo (version)
 
-parseOpts :: IO Options
+parseOpts :: (HasConfig) => IO Options
 parseOpts = execParser opts
 
-opts :: ParserInfo Options
+opts :: (HasConfig) => ParserInfo Options
 opts =
     info (pOptions <**> helper <**> longHelpOpt <**> versionOpt)
         $ fullDesc
@@ -58,7 +59,7 @@ longHelpOpt =
     longHelpRaw :: ByteString
     longHelpRaw = $(embedFile "docs/long-help.txt")
 
-pOptions :: Parser Options
+pOptions :: (HasConfig) => Parser Options
 pOptions = Options <$> pCommand <*> pVerbose
 
 pVerbose :: Parser Bool
@@ -68,7 +69,7 @@ pVerbose =
         <> long "verbose"
         <> help "Show verbose logs during processing"
 
-pCommand :: Parser Command
+pCommand :: (HasConfig) => Parser Command
 pCommand = hsubparser $ cAdd <> cList <> cEdit <> cMark <> cDelete
   where
     cAdd, cList, cEdit, cMark, cDelete :: Mod CommandFields Command
@@ -98,7 +99,7 @@ pCommand = hsubparser $ cAdd <> cList <> cEdit <> cMark <> cDelete
             $ info (Delete <$> pDeleteCommand)
             $ progDesc "Delete all tasks or delete selectively by filters"
 
-pAddCommand :: Parser AddCommand
+pAddCommand :: (HasConfig) => Parser AddCommand
 pAddCommand = AddCommand <$> pName <*> pDeadline <*> pMemo <*> pTags <*> pImportance
   where
     pName :: Parser Text
@@ -143,10 +144,17 @@ pAddCommand = AddCommand <$> pName <*> pDeadline <*> pMemo <*> pTags <*> pImport
             $ short 'i'
             <> long "importance"
             <> metavar "IMP."
-            <> help "Importance ranging from 1 to 9 (default: 4)"
-            <> value 4
+            <> help helpMsg
+            <> value ?config.importanceDefault
+      where
+        helpMsg :: String
+        helpMsg = mconcat
+            [ "Importance ranging from 1 to 9 (default: "
+            , show ?config.importanceDefault
+            , ")"
+            ]
 
-pListCommand :: Parser ListCommand
+pListCommand :: (HasConfig) => Parser ListCommand
 pListCommand = ListCommand <$> pTags <*> pStatus <*> pImportance <*> pShouldReverse
   where
     pTags :: Parser (Maybe (HashSet Text))
@@ -183,7 +191,7 @@ pListCommand = ListCommand <$> pTags <*> pStatus <*> pImportance <*> pShouldReve
             <> long "reverse"
             <> help "Reverse the order of the list"
 
-pEditCommand :: Parser EditCommand
+pEditCommand :: (HasConfig) => Parser EditCommand
 pEditCommand =
     EditCommand
         <$> pTgtName
@@ -260,7 +268,7 @@ pEditCommand =
             $ short 'i'
             <> long "importance"
             <> metavar "IMP."
-            <> help "Importance ranging from 1 to 9 (default: 4)"
+            <> help "Importance ranging from 1 to 9"
 
 pMarkCommand :: Parser MarkCommand
 pMarkCommand =
@@ -272,7 +280,7 @@ pMarkCommand =
     pName :: Parser Text
     pName = strArgument $ metavar "NAME_PATTERN"
 
-pDeleteCommand :: Parser DeleteCommand
+pDeleteCommand :: (HasConfig) => Parser DeleteCommand
 pDeleteCommand =
     hsubparser
         $ command "all" (info (pure DelAll) (progDesc "Delete all tasks"))
@@ -355,10 +363,10 @@ textSetReader =
     uniqueWords :: Text -> HashSet Text
     uniqueWords = HS.filter (not . T.null) . HS.fromList . T.splitOn " "
 
-importanceReader :: ReadM Word
+importanceReader :: (HasConfig) => ReadM Word
 importanceReader = maybeReader parseImportanceSyntax
 
-importanceRangeReader :: ReadM (Interval Word)
+importanceRangeReader :: (HasConfig) => ReadM (Interval Word)
 importanceRangeReader = maybeReader parseRange
   where
     parseRange :: String -> Maybe (Interval Word)
@@ -376,18 +384,13 @@ importanceRangeReader = maybeReader parseRange
 
         strip = L.dropWhile isSpace . L.dropWhileEnd isSpace
 
-parseImportanceSyntax :: String -> Maybe Word
+parseImportanceSyntax :: (HasConfig) => String -> Maybe Word
 parseImportanceSyntax =
-    bool
-        <$> readAlias
-        . map toLower
-        <*> Just
-        . read
-        <*> all isDigit
+    bool <$> readAlias . map toLower <*> Just . read <*> all isDigit
   where
     readAlias :: String -> Maybe Word
     readAlias "low" = Just 2
-    readAlias "default" = Just 4
+    readAlias "default" = Just $ ?config.importanceDefault
     readAlias "important" = Just 6
     readAlias "critical" = Just 8
     readAlias _ = Nothing

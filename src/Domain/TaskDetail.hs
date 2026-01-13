@@ -54,11 +54,11 @@ instance Ord TaskDetailDeadline where
     compare (DBound _) DBoundless = LT
     compare (DBound d1) (DBound d2) = d1 `compare` d2
 
-toTaskDetail :: UTCTime -> Task -> TaskDetail
-toTaskDetail now = toTaskDetailFromBasic now . toTaskBasic
+toTaskDetail :: Word -> UTCTime -> Task -> TaskDetail
+toTaskDetail dueWithinHours now = toTaskDetailFromBasic dueWithinHours now . toTaskBasic
 
-toTaskDetailFromBasic :: UTCTime -> TaskBasic -> TaskDetail
-toTaskDetailFromBasic now TaskBasic{..} =
+toTaskDetailFromBasic :: Word -> UTCTime -> TaskBasic -> TaskDetail
+toTaskDetailFromBasic dueWithinHours now TaskBasic{..} =
     TaskDetail
         { name = name
         , memo = memo
@@ -68,20 +68,26 @@ toTaskDetailFromBasic now TaskBasic{..} =
         , status = enrichStatus status
         }
   where
+    threshold :: NominalDiffTime
+    threshold = getStatusDueThreshold dueWithinHours
+
     enrichStatus :: TaskBasicStatus -> TaskDetailStatus
     enrichStatus BDone = DDone
     enrichStatus BUndone = case deadline of
         BBoundless -> DUndone
         BBound d
             | isOverdue now d -> DOverdue
-            | isDue now d -> DDue
+            | isDue' threshold now d -> DDue
             | otherwise -> DUndone
 
-isDue :: UTCTime -> UTCTime -> Bool
-isDue now = liftA2 (&&) (> now) (<= addUTCTime statusDueThreshold now)
+isDue :: Word -> UTCTime -> UTCTime -> Bool
+isDue = isDue' . getStatusDueThreshold
 
 isOverdue :: UTCTime -> UTCTime -> Bool
 isOverdue now = (<= now)
 
-statusDueThreshold :: NominalDiffTime
-statusDueThreshold = from @Pico $ 48 * 3600
+isDue' :: NominalDiffTime -> UTCTime -> UTCTime -> Bool
+isDue' threshold now = liftA2 (&&) (> now) (<= addUTCTime threshold now)
+
+getStatusDueThreshold :: Word -> NominalDiffTime
+getStatusDueThreshold dueWithinHours = from @Pico $ 3600 * fromIntegral dueWithinHours
