@@ -1,5 +1,5 @@
-{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE ImplicitParams #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module CliParser (module CliParser.Options, parseOpts) where
 
@@ -26,8 +26,8 @@ import Data.Text qualified as T
 import Data.Text.Encoding qualified as TE
 
 import CliParser.Options
-import Common.Prelude
 import Common
+import Common.Prelude
 import Paths_todo (version)
 
 parseOpts :: (HasConfig) => IO Options
@@ -148,11 +148,12 @@ pAddCommand = AddCommand <$> pName <*> pDeadline <*> pMemo <*> pTags <*> pImport
             <> value ?config.importanceDefault
       where
         helpMsg :: String
-        helpMsg = mconcat
-            [ "Importance ranging from 1 to 9 (default: "
-            , show ?config.importanceDefault
-            , ")"
-            ]
+        helpMsg =
+            mconcat
+                [ "Importance ranging from 1 to 9 (default: "
+                , show ?config.importanceDefault
+                , ")"
+                ]
 
 pListCommand :: (HasConfig) => Parser ListCommand
 pListCommand = ListCommand <$> pTags <*> pStatus <*> pImportance <*> pShouldReverse

@@ -43,8 +43,8 @@ import Domain.Core
     , EntryDeadline (..)
     , EntryPatch (..)
     , EntryStatus (..)
-    , TaskBasic (..)
     , Task
+    , TaskBasic (..)
     , TaskId
     , TodoRegistry
     )
@@ -128,12 +128,12 @@ deleteTasks taskIds = do
 
     let
         log :: (MonadLog m) => Maybe Task -> m ()
-        log
-            = logMsg
-            . ("task deleted: " <>)
-            . renderTaskSummary
-            . (toTaskDetail threshold now)
-            . fromJust
+        log =
+            logMsg
+                . ("task deleted: " <>)
+                . renderTaskSummary
+                . (toTaskDetail threshold now)
+                . fromJust
 
     for_ taskIds $ liftA2 when isJust log . (`C.getTaskById` reg)
     put $ HS.foldl' (flip C.deleteTask) reg taskIds
@@ -146,10 +146,10 @@ getTaskDetails tids = do
     reg <- get
 
     HS.toList tids
-        & mapMaybe (
-            (`C.getTaskById` reg)
-            >>> fmap (toTaskDetail threshold now)
-        )
+        & mapMaybe
+            ( (`C.getTaskById` reg)
+                >>> fmap (toTaskDetail threshold now)
+            )
         & pure
 
 getAllTasks :: (MonadRegistry m) => m (HashSet TaskId)
@@ -162,7 +162,8 @@ getUndoneTasks :: (MonadRegistry m) => m (HashSet TaskId)
 getUndoneTasks = get >>= pure . C.getUndoneTasks
 
 getOverdueTasks :: (MonadEnv m, MonadRegistry m) => m (HashSet TaskId)
-getOverdueTasks = asks (.runtime) >>= \Runtime{now} -> get >>= pure . C.getTasksUndoneAnd (isOverdue now)
+getOverdueTasks =
+    asks (.runtime) >>= \Runtime{now} -> get >>= pure . C.getTasksUndoneAnd (isOverdue now)
 
 getDueTasks :: (MonadEnv m, MonadRegistry m) => m (HashSet TaskId)
 getDueTasks = do

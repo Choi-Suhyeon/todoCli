@@ -1,5 +1,5 @@
-{-# OPTIONS_GHC -Wno-orphans #-}
 {-# LANGUAGE ImplicitParams #-}
+{-# OPTIONS_GHC -Wno-orphans #-}
 
 module Main (main) where
 
@@ -103,7 +103,7 @@ main = do
 
     let
         env :: Env
-        env = Env{ config, runtime }
+        env = Env{config, runtime}
 
     opts <- parseOpts
     reg <-

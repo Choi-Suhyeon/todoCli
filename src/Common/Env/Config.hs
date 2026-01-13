@@ -1,4 +1,5 @@
 {-# LANGUAGE ImplicitParams #-}
+
 module Common.Env.Config (HasConfig, Config (..), ConfigError (..), initConfig, parseConfig) where
 
 import Data.ByteString (ByteString)
@@ -8,8 +9,8 @@ import Toml (Codec, TomlCodec, (.=))
 import Data.Text.Encoding qualified as TE
 import Toml qualified
 
-import Common.Prelude
 import Common.Env.Config.Error
+import Common.Prelude
 
 type HasConfig = ?config :: Config
 
