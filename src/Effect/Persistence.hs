@@ -14,6 +14,7 @@ import System.Directory
     )
 import System.FilePath ((<.>), (</>))
 import System.IO (hClose, openBinaryTempFile)
+import Text.Printf (printf)
 
 import Common
 import Common.Prelude hiding (readFile)
@@ -86,7 +87,7 @@ backupRawAt dir file now =
     oldFilePath, newFilePath :: FilePath
 
     oldFilePath = dir </> file
-    newFilePath = dir </> nowStr <> "_" <> file <.> "bak"
+    newFilePath = dir </> printf ".%s_%s" nowStr file <.> "bak"
 
     nowStr :: String
     nowStr = map (replaceToDot ":-") $ iso8601Show now
