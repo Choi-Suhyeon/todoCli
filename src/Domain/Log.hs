@@ -1,7 +1,6 @@
-module Domain.Log (MonadLog, Log, logMsg, renderTaskDetail, renderTaskSummary) where
+module Domain.Log (renderTaskDetail, renderTaskSummary) where
 
 import Data.HashSet (HashSet)
-import Data.Sequence (Seq)
 import Data.Text (Text)
 import Data.Time.Format.ISO8601 (iso8601Show)
 import Data.Time.LocalTime (TimeZone, utcToLocalTime)
@@ -12,13 +11,6 @@ import Data.Text qualified as T
 
 import Common.Prelude
 import Domain.TaskDetail
-
-type MonadLog m = MonadWriter Log m
-
-type Log = Seq Text
-
-logMsg :: (MonadLog m) => Text -> m ()
-logMsg = tell . into . L.singleton . ("[I] " <>) . (<> "\n")
 
 renderTaskDetail :: TimeZone -> TaskDetail -> Text
 renderTaskDetail tz TaskDetail{name, status, deadline, tags, memo, importance} =

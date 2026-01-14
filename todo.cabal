@@ -38,6 +38,7 @@ library
       Common.Env.Config
       Common.Env.Config.Error
       Common.Env.Runtime
+      Common.Log
       Common.Prelude
       Common.Regex
       Common.Serialization

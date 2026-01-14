@@ -13,8 +13,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Added support for user-defined program configuration via `config.toml` (parsed as TOML 0.5).
 
 ### Changed
-- Adds version information to registry serialization. On deserialization failure, the existing data is backed up and a new registry is created.
+- Added version information to registry serialization. On deserialization failure, the existing data is backed up and a new registry is created.
 - Improved list status line to show priority orientation (`prio high at top/bottom`).
+- Emitted warning logs regardless of the global verbose flag.
 
 ## [2.1.0] - 2026-01-06
 

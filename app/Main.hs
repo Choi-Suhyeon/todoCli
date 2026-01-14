@@ -30,9 +30,12 @@ import Domain.Core
 import Effect
 import View
 
-newtype App a = App
-    { unApp :: ReaderT Env (StateT TodoRegistry (ExceptT AppError (WriterT Log IO))) a
-    }
+type BaseM = ExceptT AppError (WriterT Log IO)
+
+runBaseM :: BaseM a -> IO (Either AppError a, Log)
+runBaseM = runWriterT . runExceptT
+
+newtype App a = App {unApp :: ReaderT Env (StateT TodoRegistry BaseM) a}
     deriving newtype
         ( Applicative
         , Functor
@@ -44,10 +47,10 @@ newtype App a = App
         , MonadWriter Log
         )
 
-runApp
-    :: Env -> TodoRegistry -> App a -> IO (Either AppError (a, TodoRegistry), Log)
-runApp env reg =
-    runWriterT . runExceptT . flip runStateT reg . flip runReaderT env . (.unApp)
+runAppM :: Env -> TodoRegistry -> App a -> BaseM (a, TodoRegistry)
+runAppM env reg = flip runStateT reg . flip runReaderT env . (.unApp)
+
+type MonadAppError m = MonadError AppError m
 
 data AppError
     = DomainE DomainError
@@ -55,6 +58,13 @@ data AppError
     | ParserE ParserError
     | StorageE StorageError
     | ConfigE ConfigError
+
+instance Show AppError where
+    show (DomainE x) = "[E:Logic] " <> show x
+    show (EffectE x) = "[E:System] " <> show x
+    show (ParserE x) = "[E:Parser] " <> show x
+    show (StorageE x) = "[E:Storage] " <> show x
+    show (ConfigE x) = "[E:Config] " <> show x
 
 instance From DomainError AppError where
     from = DomainE
@@ -78,7 +88,9 @@ instance Show ParserError where
     show NoOptionsProvided = "At least one option is required"
 
 data StorageError = SerializationE String
-    deriving (Show)
+
+instance Show StorageError where
+    show (SerializationE x) = x
 
 instance From SerializationError StorageError where
     from (DeserializationFailed e) = SerializationE e
@@ -86,66 +98,80 @@ instance From SerializationError StorageError where
 instance From StorageError AppError where
     from = StorageE
 
-instance Show AppError where
-    show (DomainE x) = "[E:Logic] " <> show x
-    show (EffectE x) = "[E:System] " <> show x
-    show (ParserE x) = "[E:Parser] " <> show x
-    show (StorageE x) = "[E:Storage] " <> show x
-    show (ConfigE x) = "[E:Config] " <> show x
+showErrWithoutTag :: AppError -> String
+showErrWithoutTag (DomainE x) = show x
+showErrWithoutTag (EffectE x) = show x
+showErrWithoutTag (ParserE x) = show x
+showErrWithoutTag (StorageE x) = show x
+showErrWithoutTag (ConfigE x) = show x
 
 main :: IO ()
 main = do
-    config <- loadConfig
-    runtime <- initRuntime
+    (res, logs) <- runBaseM do
+        config <- loadConfig
+        runtime <- initRuntime
 
-    let
-        ?config = config
+        let
+            ?config = config
 
-    let
-        env :: Env
-        env = Env{config, runtime}
+        let
+            env :: Env
+            env = Env{config, runtime}
 
-    opts <- parseOpts
-    reg <-
-        loadRegistryWithBackup env >>= \case
-            Right r -> pure r
-            Left e -> do
-                TIO.hPutStr stderr (into (show e))
-                exitFailure
+            writeWithCereal :: TodoRegistry -> BaseM ()
+            writeWithCereal = writeData . serialize . UsingCereal
 
-    (result, logs) <- main' opts & runApp env reg
-    result' <-
-        runExceptT $ writeData . serialize . UsingCereal . snd =<< ExceptT (pure result)
+        reg0 <- loadRegistryWithBackup env
+        opts <- liftIO parseOpts
+        ((), reg1) <- runAppM env reg0 $ main' opts
+
+        writeWithCereal reg1
 
     let
         printLogsEndedWith :: Maybe Text -> IO ()
         printLogsEndedWith = TIO.hPutStr stderr . foldMap id . (logs <>) . into . maybeToList
 
-    case result' of
+        getErrMsg :: AppError -> Text
+        getErrMsg = (<> "\n") . into . show
+
+    case res of
         Right () -> printLogsEndedWith Nothing *> exitSuccess
-        Left e -> printLogsEndedWith (Just $ (<> "\n") $ into $ show e) *> exitFailure
+        Left e -> printLogsEndedWith (Just $ getErrMsg e) *> exitFailure
   where
-    initRuntime :: IO Runtime
+    initRuntime :: (MonadIO m) => m Runtime
     initRuntime = do
-        now <- getCurrentTime
-        tz <- getCurrentTimeZone
+        now <- liftIO getCurrentTime
+        tz <- liftIO getCurrentTimeZone
 
         pure Runtime{now, tz}
 
-    loadConfig :: IO Config
-    loadConfig = pure . fromRight initConfig =<< runExceptT load
+    loadConfig :: (MonadIO m, MonadLog m) => m Config
+    loadConfig = either onFail pure =<< runExceptT load
       where
-        load :: ExceptT AppError IO Config
+        load :: (MonadIO m) => ExceptT AppError m Config
         load = liftEitherInto . parseConfig =<< readConfig
 
-    loadRegistryWithBackup :: Env -> IO (Either AppError TodoRegistry)
-    loadRegistryWithBackup env =
+        onFail :: (MonadLog m) => AppError -> m Config
+        onFail = (pure initConfig <*) . logMsg LogWarning . warningMsg
+
+        warningMsg :: AppError -> Text
+        warningMsg = (<>) "Config loading failed: " . into . showErrWithoutTag
+
+    loadRegistryWithBackup
+        :: (MonadAppError m, MonadIO m, MonadLog m) => Env -> m TodoRegistry
+    loadRegistryWithBackup Env{runtime = Runtime{now}} =
         loadRegistry >>= \case
-            r@(Right _) -> pure r
-            Left (StorageE (SerializationE _)) -> do
-                b <- runExceptT $ backupData env.runtime.now
-                pure $ initTodoRegistry <$ b
-            e@(Left _) -> pure e
+            Left e@(StorageE (SerializationE _)) -> do
+                let
+                    msg1, msg2 :: Text
+
+                    msg1 = "Registry deserialization failed: " <> into (showErrWithoutTag e)
+                    msg2 = "Attempting to back up the existing registry; if successful, a new registry will be created."
+
+                logMsg LogWarning msg1
+                logMsg LogWarning msg2
+                initTodoRegistry <$ backupData now
+            other -> liftEither other
 
     loadRegistry :: (MonadIO m) => m (Either AppError TodoRegistry)
     loadRegistry = do
@@ -278,10 +304,10 @@ runDeleteCommand DelBy{byName, byTags, byStatus, byImportance} = do
     handleResult (Just []) = throwError $ ParserE DeletionTargetNotFound
     handleResult (Just xs) = pure xs
 
-getUniqueTarget :: (MonadError AppError m, MonadRegistry m) => Text -> m TaskId
+getUniqueTarget :: (MonadAppError m, MonadRegistry m) => Text -> m TaskId
 getUniqueTarget = getTasksByNameRegex >=> getFromSingleton
 
-getFromSingleton :: (Foldable f, MonadError AppError m) => f a -> m a
+getFromSingleton :: (Foldable f, MonadAppError m) => f a -> m a
 getFromSingleton = (. toList) \case
     [x] -> pure x
     [] -> throwError $ ParserE TargetNotFoundError

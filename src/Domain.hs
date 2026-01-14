@@ -70,7 +70,7 @@ addTask e = do
         taskInfo = renderTaskDetail tz $ toTaskDetail threshold now newTask
 
     put reg'
-    logMsg $ "task added:\n" <> taskInfo
+    logMsg LogInfo $ "task added:\n" <> taskInfo
 
 editTask
     :: (MonadDomainError e m, MonadEnv m, MonadLog m, MonadRegistry m)
@@ -92,7 +92,11 @@ editTask e tid = do
         msgForOld = renderTaskDetail tz $ toTaskDetail threshold now oldTask
         msgForNew = renderTaskDetail tz $ toTaskDetail threshold now newTask
 
-    logMsg $ "task updated:\n  (old)\n" <> msgForOld <> "\n  (new)\n" <> msgForNew
+    logMsg LogInfo
+        $ "task updated:\n  (old)\n"
+        <> msgForOld
+        <> "\n  (new)\n"
+        <> msgForNew
     put $ C.replaceTask tid newTask reg
 
 markTask
@@ -115,7 +119,12 @@ markTask s tid = do
                     , status = Just s
                     }
 
-        logMsg $ "task marked " <> (show s & into & T.toLower) <> ": '" <> name <> "'"
+        logMsg LogInfo
+            $ "task marked "
+            <> (show s & into & T.toLower)
+            <> ": '"
+            <> name
+            <> "'"
         put
             $ C.replaceTask tid (fromRight undefined $ C.modifyTask tz now entry task) reg
 
@@ -129,7 +138,7 @@ deleteTasks taskIds = do
     let
         log :: (MonadLog m) => Maybe Task -> m ()
         log =
-            logMsg
+            logMsg LogInfo
                 . ("task deleted: " <>)
                 . renderTaskSummary
                 . (toTaskDetail threshold now)
