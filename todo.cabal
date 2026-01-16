@@ -104,7 +104,6 @@ library
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wredundant-constraints
   build-depends:
       base
-    , boxes
     , bytestring
     , cereal
     , containers
@@ -112,11 +111,13 @@ library
     , directory
     , file-embed
     , filepath
+    , formatting
     , hashable
     , mtl
     , optparse-applicative
     , regex-tdfa
     , split
+    , table-layout
     , template-haskell
     , text
     , time
@@ -169,7 +170,6 @@ executable todo
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base
-    , boxes
     , bytestring
     , cereal
     , containers
@@ -177,11 +177,13 @@ executable todo
     , directory
     , file-embed
     , filepath
+    , formatting
     , hashable
     , mtl
     , optparse-applicative
     , regex-tdfa
     , split
+    , table-layout
     , template-haskell
     , text
     , time

@@ -41,7 +41,6 @@ let ghcOptions : List Text =
 
 let dependencies : List Text =
     [ "base"
-    , "boxes"
     , "bytestring"
     , "cereal"
     , "containers"
@@ -49,11 +48,13 @@ let dependencies : List Text =
     , "directory"
     , "file-embed"
     , "filepath"
+    , "formatting"
     , "hashable"
     , "mtl"
     , "optparse-applicative"
     , "regex-tdfa"
     , "split"
+    , "table-layout"
     , "template-haskell"
     , "text"
     , "time"

@@ -9,10 +9,10 @@ import Data.List.NonEmpty (nonEmpty)
 import Data.Text (Text)
 import Data.Time.Clock (getCurrentTime)
 import Data.Time.LocalTime (getCurrentTimeZone, localTimeToUTC)
+import Formatting (int, sformat, stext, (%))
 import System.Exit (exitFailure, exitSuccess)
 import System.IO (stderr)
 import System.IO.Error (ioeGetErrorType, isDoesNotExistErrorType)
-import Text.Printf (printf)
 
 import Data.HashSet qualified as HS
 import Data.Text.IO qualified as TIO
@@ -166,7 +166,8 @@ main = do
                     msg1, msg2 :: Text
 
                     msg1 = "Registry deserialization failed: " <> into (showErrWithoutTag e)
-                    msg2 = "Attempting to back up the existing registry; if successful, a new registry will be created."
+                    msg2 =
+                        "Attempting to back up the existing registry; if successful, a new registry will be created."
 
                 logMsg LogWarning msg1
                 logMsg LogWarning msg2
@@ -236,18 +237,18 @@ runListCommand ListCommand{tags, status, importance, shouldReverse} = do
         numOfSnapshots :: Int
         numOfSnapshots = length snapshots
 
-        infoToShow :: String
+        infoToShow :: Text
         infoToShow =
-            printf
-                "%d task%s (prio high at %s)\n"
+            sformat
+                (int % " task" % stext % " (prio high at " % stext % ")\n")
                 numOfSnapshots
-                (bool "" "s" (numOfSnapshots > 1) :: String)
-                (bool "bottom" "top" shouldReverse :: String)
+                (bool "" "s" (numOfSnapshots > 1))
+                (bool "bottom" "top" shouldReverse)
 
         renderConfig :: TaskDetailRenderConfig
         renderConfig = initTaskDetailRenderConfig tz infoToShow
 
-    liftIO . putStrLn $ renderTable renderConfig snapshots
+    liftIO . TIO.putStrLn $ renderTable renderConfig snapshots
 
 runEditCommand :: EditCommand -> App ()
 runEditCommand EditCommand{tgtName, name, deadline, memo, tags, importance} = do
