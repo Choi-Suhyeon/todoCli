@@ -35,12 +35,12 @@ import Data.Time.LocalTime (TimeZone, utcToLocalTime)
 import Data.HashSet qualified as HS
 import Data.Text qualified as T
 
-import Common.Interval (Extended (..), Interval, (<=..<=))
-import Common.Prelude hiding (get, put)
 import Domain.Core.Task.Raw
 import Domain.Error
+import External.Interval (Extended (..), Interval, (<=..<=))
+import External.Prelude hiding (get, put)
 
-import Common.Interval qualified as I
+import External.Interval qualified as I
 
 data EntryCreation = EntryCreation
     { name :: !Text

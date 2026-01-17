@@ -13,8 +13,8 @@ import Data.HashSet (HashSet)
 import Data.Text (Text)
 import Data.Time.Clock (NominalDiffTime, UTCTime, addUTCTime)
 
-import Common.Prelude
 import Domain.Core
+import External.Prelude
 
 data TaskDetail = TaskDetail
     { name :: !Text

@@ -1,4 +1,4 @@
-module Common.Prelude
+module External.Prelude
     ( module Prelude
     , module Control.Applicative
     , module Control.Monad

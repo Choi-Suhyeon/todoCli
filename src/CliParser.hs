@@ -26,9 +26,9 @@ import Data.Text.Encoding qualified as TE
 
 import CliParser.Options
 import Common
-import Common.Interval (Extended (..), Interval, (<=..<=))
-import Common.Prelude
-import Common.Regex
+import External.Interval (Extended (..), Interval, (<=..<=))
+import External.Prelude
+import External.Regex
 import Paths_todo (version)
 
 parseOpts :: (HasConfig) => IO Options

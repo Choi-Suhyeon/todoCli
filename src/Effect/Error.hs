@@ -3,7 +3,7 @@ module Effect.Error (MonadEffectError, EffectError (..)) where
 import Control.Exception (IOException)
 import System.IO.Error (ioeGetErrorType)
 
-import Common.Prelude
+import External.Prelude
 
 type MonadEffectError e m = (MonadError e m, From EffectError e)
 

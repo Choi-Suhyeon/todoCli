@@ -2,7 +2,7 @@ module Common.Env.Config.Error (ConfigError (..)) where
 
 import Toml (TomlDecodeError)
 
-import Common.Prelude
+import External.Prelude
 
 data ConfigError
     = TomlDecodingFailed [TomlDecodeError]

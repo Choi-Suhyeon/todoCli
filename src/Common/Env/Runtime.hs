@@ -3,7 +3,7 @@ module Common.Env.Runtime (Runtime (..)) where
 import Data.Time.Clock (UTCTime)
 import Data.Time.LocalTime (TimeZone)
 
-import Common.Prelude
+import External.Prelude
 
 data Runtime = Runtime
     { now :: !UTCTime

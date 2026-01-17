@@ -7,9 +7,9 @@ import Data.Serialize (Serialize (..), getWord16le, putWord16le)
 import Data.Text (Text)
 import Data.Word (Word16)
 
-import Common.Prelude hiding (get, put)
 import Domain.Core.Task.Internal
 import Domain.Core.TaskId.Internal
+import External.Prelude hiding (get, put)
 
 latestVersion :: Word16
 latestVersion = 1

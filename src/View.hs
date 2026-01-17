@@ -1,4 +1,9 @@
-module View (TaskDetailRenderConfig, initTaskDetailRenderConfig, sortTaskDetails) where
+module View
+    ( TaskDetailRenderConfig
+    , initTaskDetailRenderConfig
+    , sortTaskDetails
+    , renderTable
+    ) where
 
 import Data.List (sort, sortBy)
 import Data.Ord (Down (..), comparing)
@@ -14,12 +19,9 @@ import Text.Layout.Table
     , noAlign
     , noCutMark
     )
-import Witch
 
 import Data.Text qualified as T
 
-import Common.Interval (Interval, fromFinite, upperIntegralBound)
-import Common.Prelude
 import Domain
     ( TaskDetail (..)
     , TaskDetailDeadline (..)
@@ -27,7 +29,9 @@ import Domain
     , memoLenBound
     , nameLenBound
     )
-import Effect.Format
+import View.Format
+import External.Interval (Interval, fromFinite, upperIntegralBound)
+import External.Prelude
 
 data ColNameTaskDetail
     = CNStatus

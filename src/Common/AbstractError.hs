@@ -5,7 +5,7 @@ module Common.AbstractError
     , liftEitherAs
     ) where
 
-import Common.Prelude
+import External.Prelude
 
 throwErrorInto :: forall e t m a. (From t e, MonadError e m) => t -> m a
 throwErrorInto = throwError . into

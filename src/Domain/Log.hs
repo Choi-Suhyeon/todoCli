@@ -9,8 +9,8 @@ import Data.HashSet qualified as HS
 import Data.List qualified as L
 import Data.Text qualified as T
 
-import Common.Prelude
 import Domain.TaskDetail
+import External.Prelude
 
 renderTaskDetail :: TimeZone -> TaskDetail -> Text
 renderTaskDetail tz TaskDetail{name, status, deadline, tags, memo, importance} =

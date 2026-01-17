@@ -38,9 +38,6 @@ import Data.HashSet qualified as HS
 import Data.Text qualified as T
 
 import Common
-import Common.Interval (Interval, member)
-import Common.Prelude hiding (log)
-import Common.Regex
 import Domain.Core
     ( EntryCreation (..)
     , EntryDeadline (..)
@@ -54,6 +51,9 @@ import Domain.Core
 import Domain.Error
 import Domain.Log
 import Domain.TaskDetail
+import External.Interval (Interval, member)
+import External.Prelude hiding (log)
+import External.Regex
 
 import Domain.Core qualified as C
 

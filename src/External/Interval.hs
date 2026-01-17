@@ -1,4 +1,4 @@
-module Common.Interval
+module External.Interval
     ( module Data.Interval
     , fromFinite
     , show'
@@ -8,7 +8,7 @@ module Common.Interval
 
 import Data.Interval
 
-import Common.Prelude
+import External.Prelude
 
 fromFinite :: Extended r -> Maybe r
 fromFinite (Finite n) = Just n

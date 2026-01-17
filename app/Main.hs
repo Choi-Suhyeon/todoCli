@@ -19,7 +19,6 @@ import Data.Text.IO qualified as TIO
 
 import CliParser
 import Common
-import Common.Prelude
 import Domain
 import Domain.Core
     ( checkIdInvariant
@@ -28,6 +27,7 @@ import Domain.Core
     , rebuildIds
     )
 import Effect
+import External.Prelude
 import View
 
 type BaseM = ExceptT AppError (WriterT Log IO)

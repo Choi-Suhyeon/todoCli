@@ -5,10 +5,10 @@ import Data.Time.LocalTime (LocalTime)
 import Formatting (formatToString, int, string, (%+))
 import Text.Printf (printf)
 
-import Common.Interval (Interval)
-import Common.Prelude
+import External.Interval (Interval)
+import External.Prelude
 
-import Common.Interval qualified as I
+import External.Interval qualified as I
 
 type MonadDomainError e m = (MonadError e m, From DomainError e)
 

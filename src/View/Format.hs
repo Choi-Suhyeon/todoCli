@@ -1,11 +1,11 @@
-module Effect.Format (Column (..), RenderConfig (..), renderTable) where
+module View.Format (Column (..), RenderConfig (..), renderTable) where
 
 import Data.Text (Text)
 import Text.Layout.Table (ColSpec, Row, concatGrid, gridB)
 
 import Data.Text qualified as T
 
-import Common.Prelude
+import External.Prelude
 
 data Column a = Column
     { name :: Text

@@ -29,12 +29,12 @@ import Data.HashSet qualified as HS
 import Data.IntMap qualified as IM
 import Data.Map qualified as M
 
-import Common.Prelude
 import Common.Serialization.CerealOrphans ()
 import Domain.Core.Task.Internal
 import Domain.Core.TaskId.Internal
 import Domain.Core.TodoRegistry.Raw
 import Domain.Error
+import External.Prelude
 
 initTodoRegistry :: TodoRegistry
 initTodoRegistry = TodoRegistry initIds IM.empty M.empty M.empty

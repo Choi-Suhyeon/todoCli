@@ -10,7 +10,7 @@ import Data.Text.Encoding qualified as TE
 import Toml qualified
 
 import Common.Env.Config.Error
-import Common.Prelude
+import External.Prelude
 
 type HasConfig = ?config :: Config
 

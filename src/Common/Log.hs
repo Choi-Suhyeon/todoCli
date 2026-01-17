@@ -5,7 +5,7 @@ import Data.Text (Text)
 
 import Data.List qualified as L
 
-import Common.Prelude
+import External.Prelude
 
 type MonadLog m = MonadWriter Log m
 

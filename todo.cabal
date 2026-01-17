@@ -38,10 +38,7 @@ library
       Common.Env.Config
       Common.Env.Config.Error
       Common.Env.Runtime
-      Common.Interval
       Common.Log
-      Common.Prelude
-      Common.Regex
       Common.Serialization
       Common.Serialization.CerealOrphans
       Domain
@@ -61,9 +58,12 @@ library
       Domain.TaskDetail
       Effect
       Effect.Error
-      Effect.Format
       Effect.Persistence
+      External.Interval
+      External.Prelude
+      External.Regex
       View
+      View.Format
   other-modules:
       Paths_todo
   autogen-modules:

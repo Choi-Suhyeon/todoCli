@@ -19,8 +19,8 @@ import Data.Time.LocalTime (LocalTime)
 
 import Data.Text qualified as T
 
-import Common.Interval (Interval)
-import Common.Prelude
+import External.Interval (Interval)
+import External.Prelude
 
 data Options = Options
     { optCommand :: Command

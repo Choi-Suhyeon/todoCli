@@ -17,8 +17,8 @@ import System.IO (hClose, openBinaryTempFile)
 import Text.Printf (printf)
 
 import Common
-import Common.Prelude hiding (readFile)
 import Effect.Error
+import External.Prelude hiding (readFile)
 
 readData :: (MonadEffectError e m, MonadIO m) => m ByteString
 readData = readRaw getDataDirectory dataFileName

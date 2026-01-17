@@ -7,7 +7,7 @@ module Common.Env
 
 import Common.Env.Config
 import Common.Env.Runtime
-import Common.Prelude
+import External.Prelude
 
 data Env = Env
     { config :: !Config

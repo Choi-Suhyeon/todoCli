@@ -5,7 +5,7 @@ import Data.Int (Int64)
 import Data.IntSet (IntSet)
 import Data.Serialize (Get, Serialize (..))
 
-import Common.Prelude hiding (get, put)
+import External.Prelude hiding (get, put)
 
 newtype TaskId = TaskId {unTaskId :: Int}
     deriving stock (Eq, Ord, Show)
