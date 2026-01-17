@@ -7,7 +7,6 @@ import Control.Arrow ((>>>))
 import Data.ByteString (ByteString)
 import Data.FileEmbed (embedFile)
 import Data.HashSet (HashSet)
-import Data.Interval (Extended (..), Interval, (<=..<=))
 import Data.Text (Text)
 import Data.Time.Calendar (Day (..))
 import Data.Time.Format.ISO8601
@@ -27,7 +26,9 @@ import Data.Text.Encoding qualified as TE
 
 import CliParser.Options
 import Common
+import Common.Interval (Extended (..), Interval, (<=..<=))
 import Common.Prelude
+import Common.Regex
 import Paths_todo (version)
 
 parseOpts :: (HasConfig) => IO Options
@@ -104,7 +105,7 @@ pAddCommand = AddCommand <$> pName <*> pDeadline <*> pMemo <*> pTags <*> pImport
   where
     pName :: Parser Text
     pName =
-        option nameReader
+        option simpleTextReader
             $ short 'n'
             <> long "name"
             <> metavar "NAME"
@@ -122,7 +123,7 @@ pAddCommand = AddCommand <$> pName <*> pDeadline <*> pMemo <*> pTags <*> pImport
 
     pMemo :: Parser Text
     pMemo =
-        option descReader
+        option simpleTextReader
             $ short 'm'
             <> long "memo"
             <> metavar "MEMO"
@@ -208,7 +209,7 @@ pEditCommand =
     pName :: Parser (Maybe Text)
     pName =
         optional
-            $ option nameReader
+            $ option simpleTextReader
             $ short 'n'
             <> long "name"
             <> metavar "NAME"
@@ -223,7 +224,7 @@ pEditCommand =
                 <> long "clear-memo"
                 <> help "Clear the task memo"
         memo =
-            option (Memo <$> descReader)
+            option (Memo <$> simpleTextReader)
                 $ short 'm'
                 <> long "memo"
                 <> metavar "MEMO"
@@ -294,7 +295,7 @@ pDeleteCommand =
     pByName :: Parser (Maybe Text)
     pByName =
         optional
-            $ option nameReader
+            $ strOption
             $ short 'n'
             <> long "name"
             <> metavar "NAME_PATTERN"
@@ -327,11 +328,11 @@ pDeleteCommand =
             <> metavar "IMP."
             <> help "Filter by task importance"
 
-nameReader :: ReadM Text
-nameReader = maybeReader $ liftA2 (bool Nothing) (Just . T.pack) ((<= 30) . length)
-
-descReader :: ReadM Text
-descReader = maybeReader $ liftA2 (bool Nothing) (Just . T.pack) ((<= 60) . length)
+simpleTextReader :: ReadM Text
+simpleTextReader = maybeReader $ mfilter isValidFormat . pure . T.strip . into
+  where
+    isValidFormat :: Text -> Bool
+    isValidFormat = (=~ ("^[^[:blank:]]+([[:blank:]][^[:blank:]]+)*$" :: Text))
 
 datetimeReader :: ReadM OptionDeadline
 datetimeReader =
@@ -348,18 +349,15 @@ datetimeReader =
 textSetReader :: ReadM (HashSet Text)
 textSetReader =
     maybeReader
-        $ mfilter isValidSetLen
-        . fmap uniqueWords
+        $ fmap uniqueWords
         . mfilter isValidFormat
         . pure
         . T.toUpper
-        . T.pack
+        . T.strip
+        . into
   where
     isValidFormat :: Text -> Bool
-    isValidFormat = (=~ ("^ *[A-Z]{1,10}( +[A-Z]{1,10})* *$" :: Text))
-
-    isValidSetLen :: HashSet a -> Bool
-    isValidSetLen = liftA2 (&&) (> 0) (<= 4) . length
+    isValidFormat = (=~ ("^[^[:space:]]+( +[^[:space:]]+)*$" :: Text))
 
     uniqueWords :: Text -> HashSet Text
     uniqueWords = HS.filter (not . T.null) . HS.fromList . T.splitOn " "

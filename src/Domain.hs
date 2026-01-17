@@ -13,6 +13,8 @@ module Domain
     , TaskDetailDeadline (..)
     , TaskDetailStatus (..)
     , C.initTodoRegistry
+    , C.nameLenBound
+    , C.memoLenBound
     , getAllTasks
     , getTasksWithAllTags
     , getTasksByNameRegex
@@ -30,14 +32,15 @@ module Domain
 
 import Control.Arrow ((>>>))
 import Data.HashSet (HashSet)
-import Data.Interval (Interval, member)
 import Data.Text (Text)
 
 import Data.HashSet qualified as HS
 import Data.Text qualified as T
 
 import Common
+import Common.Interval (Interval, member)
 import Common.Prelude hiding (log)
+import Common.Regex
 import Domain.Core
     ( EntryCreation (..)
     , EntryDeadline (..)

@@ -210,8 +210,9 @@ runCommand (Mark x) = runMarkCommand x
 runCommand (Delete x) = runDeleteCommand x
 
 runAddCommand :: AddCommand -> App ()
-runAddCommand AddCommand{name, deadline, memo, tags, importance} = do
-    optionDeadlineToEntryDeadline deadline >>= \utcDeadline -> addTask EntryCreation{name, memo, tags, importance, deadline = utcDeadline}
+runAddCommand AddCommand{name, deadline, memo, tags, importance} =
+    optionDeadlineToEntryDeadline deadline
+        >>= \utcDeadline -> addTask EntryCreation{name, memo, tags, importance, deadline = utcDeadline}
 
 runListCommand :: ListCommand -> App ()
 runListCommand ListCommand{tags, status, importance, shouldReverse} = do

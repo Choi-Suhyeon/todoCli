@@ -1,8 +1,4 @@
-module Effect.Format
-    ( Column (..)
-    , RenderConfig (..)
-    , renderTable
-    ) where
+module Effect.Format (Column (..), RenderConfig (..), renderTable) where
 
 import Data.Text (Text)
 import Text.Layout.Table (ColSpec, Row, concatGrid, gridB)

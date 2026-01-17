@@ -14,12 +14,12 @@ module CliParser.Options
     ) where
 
 import Data.HashSet (HashSet)
-import Data.Interval (Interval)
 import Data.Text (Text)
 import Data.Time.LocalTime (LocalTime)
 
 import Data.Text qualified as T
 
+import Common.Interval (Interval)
 import Common.Prelude
 
 data Options = Options

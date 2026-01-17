@@ -18,11 +18,14 @@ import Witch
 
 import Data.Text qualified as T
 
+import Common.Interval (Interval, fromFinite, upperIntegralBound)
 import Common.Prelude
 import Domain
     ( TaskDetail (..)
     , TaskDetailDeadline (..)
     , TaskDetailStatus (..)
+    , memoLenBound
+    , nameLenBound
     )
 import Effect.Format
 
@@ -50,15 +53,24 @@ initTaskDetailRenderConfig tz moreInfo =
     RenderConfig
         { moreInfo
         , cols =
-            [ Column "ST." renderStatus $ column (fixed 3) left noAlign noCutMark
-            , Column "IMP." renderImportance $ column (fixed 4) left noAlign noCutMark
-            , Column "Name" renderName $ column (expandBetween 4 30) left noAlign noCutMark
-            , Column "Deadline" renderDeadline $ column (fixedUntil 8) left noAlign noCutMark
-            , Column "Tags" renderTags $ column (fixedUntil 4) left noAlign noCutMark
-            , Column "Memo" renderMemo $ column (expandBetween 4 60) left noAlign noCutMark
+            [ Column "ST." renderStatus
+                $ column (fixed 3) left noAlign noCutMark
+            , Column "IMP." renderImportance
+                $ column (fixed 4) left noAlign noCutMark
+            , Column "Name" renderName
+                $ column (expandBetween 4 $ getMaxLen nameLenBound) left noAlign noCutMark
+            , Column "Deadline" renderDeadline
+                $ column (fixedUntil 8) left noAlign noCutMark
+            , Column "Tags" renderTags
+                $ column (fixedUntil 4) left noAlign noCutMark
+            , Column "Memo" renderMemo
+                $ column (expandBetween 4 $ getMaxLen memoLenBound) left noAlign noCutMark
             ]
         }
   where
+    getMaxLen :: Interval Int -> Int
+    getMaxLen = fromJust . fromFinite . upperIntegralBound
+
     renderStatus :: TaskDetail -> Text
     renderStatus TaskDetail{status = DOverdue} = "[X]"
     renderStatus TaskDetail{status = DDue} = "[!]"
