@@ -5,12 +5,13 @@ import Data.Time.LocalTime (LocalTime)
 import Formatting (formatToString, int, string, (%+))
 import Text.Printf (printf)
 
+import Common
 import External.Interval (Interval)
 import External.Prelude
 
 import External.Interval qualified as I
 
-type MonadDomainError e m = (MonadError e m, From DomainError e)
+type MonadDomainError e m = MonadErrorFrom DomainError e m
 
 data DomainError
     = EmptyTitle

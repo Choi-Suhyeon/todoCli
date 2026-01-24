@@ -61,6 +61,7 @@ let dependencies : List Text =
     , "tomland"
     , "transformers"
     , "unordered-containers"
+    , "vty"
     , "witch"
     ]
 

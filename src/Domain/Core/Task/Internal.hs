@@ -31,9 +31,9 @@ import Data.HashSet (HashSet)
 import Data.Text (Text)
 import Data.Time.Clock (UTCTime (..))
 import Data.Time.LocalTime (TimeZone, utcToLocalTime)
+import Graphics.Text.Width (safeWctwidth)
 
 import Data.HashSet qualified as HS
-import Data.Text qualified as T
 
 import Domain.Core.Task.Raw
 import Domain.Error
@@ -213,13 +213,13 @@ validateImportance =
         . into @TaskImportance
 
 validateName :: Text -> Either DomainError ()
-validateName = liftA2 ensure (InvalidNameLength nameLenBound) id . T.length
+validateName = liftA2 ensure (InvalidNameLength nameLenBound) id . safeWctwidth
   where
     ensure :: DomainError -> Int -> Either DomainError ()
     ensure err = ensureInBound err nameLenBound
 
 validateMemo :: Text -> Either DomainError ()
-validateMemo = liftA2 ensure (InvalidMemoLength memoLenBound) id . T.length
+validateMemo = liftA2 ensure (InvalidMemoLength memoLenBound) id . safeWctwidth
   where
     ensure :: DomainError -> Int -> Either DomainError ()
     ensure err = ensureInBound err memoLenBound
@@ -236,7 +236,7 @@ validateAllTagLength = (`HS.foldl'` Right ()) \acc tag ->
         *> ensureInBound
             (InvalidTagLength tagLenBound)
             tagLenBound
-            (T.length tag)
+            (safeWctwidth tag)
 
 whenJust :: (Applicative f) => (a -> f ()) -> Maybe a -> f ()
 whenJust = maybe (pure ())

@@ -25,6 +25,7 @@ dependencies:
   - tomland
   - transformers
   - unordered-containers
+  - vty
   - witch
 description: "Please see the README on GitHub at <https://github.com/Choi-Suhyeon/todoCli#readme>"
 executables:

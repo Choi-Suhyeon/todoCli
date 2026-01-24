@@ -2,6 +2,7 @@ module View.Format (Column (..), RenderConfig (..), renderTable) where
 
 import Data.Text (Text)
 import Text.Layout.Table (ColSpec, Row, concatGrid, gridB)
+import Text.Layout.Table.Cell.WideString (WideText (..))
 
 import Data.Text qualified as T
 
@@ -19,15 +20,21 @@ data RenderConfig a = RenderConfig
     }
 
 renderTable :: forall a. RenderConfig a -> [a] -> Text
-renderTable RenderConfig{..} = renderWithInfo . (:) headers . fmap toBody
+renderTable RenderConfig{..} = renderWithInfo . (:) wideTextHeaders . fmap toBody
   where
-    renderWithInfo :: [Row Text] -> Text
+    renderWithInfo :: [Row WideText] -> Text
     renderWithInfo = (<> info) . concatGrid 2 . gridB specs
       where
         info = liftA3 bool ("\n" <>) id T.null moreInfo
 
-    toBody :: a -> [Text]
-    toBody = (<$> renders) . (&)
+    toBody :: a -> [WideText]
+    toBody = (<$> rendersToWideText) . (&)
+
+    rendersToWideText :: [a -> WideText]
+    rendersToWideText = map (WideText .) renders
+
+    wideTextHeaders :: [WideText]
+    wideTextHeaders = map WideText headers
 
     renders :: [a -> Text]
     headers :: [Text]

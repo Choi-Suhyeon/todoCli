@@ -3,9 +3,10 @@ module Effect.Error (MonadEffectError, EffectError (..)) where
 import Control.Exception (IOException)
 import System.IO.Error (ioeGetErrorType)
 
+import Common
 import External.Prelude
 
-type MonadEffectError e m = (MonadError e m, From EffectError e)
+type MonadEffectError e m = MonadErrorFrom EffectError e m
 
 data EffectError
     = GettingDataDirectoryFailed
