@@ -329,29 +329,46 @@ pDeleteCommand =
             <> help "Filter by task importance"
 
 simpleTextReader :: ReadM Text
-simpleTextReader = maybeReader $ mfilter isValidFormat . pure . T.strip . into
+simpleTextReader =
+    eitherReader $ liftA2 (bool $ Left errMsg) Right isValidFormat . T.strip . into
   where
     isValidFormat :: Text -> Bool
     isValidFormat = (=~ ("^[^[:blank:]]+([[:blank:]][^[:blank:]]+)*$" :: Text))
 
+    errMsg :: String
+    errMsg = "Text format mismatch: multiple consecutive spaces are not allowed"
+
 datetimeReader :: ReadM OptionDeadline
 datetimeReader =
-    maybeReader
-        $ (<|>)
-        <$> fmap (Bound . fromDayToLocalTime)
-        . parseFormatExtension calendarFormat
-        <*> fmap Bound
-        . iso8601ParseM
+    eitherReader
+        $ maybeToEither errMsg
+        . asum
+        . flip
+            map
+            [ parseCalendarFormat
+            , parseISO8601Format
+            ]
+        . (&)
   where
+    parseCalendarFormat, parseISO8601Format :: String -> Maybe OptionDeadline
+
+    parseCalendarFormat = fmap (Bound . fromDayToLocalTime) . parseFormatExtension calendarFormat
+    parseISO8601Format = fmap Bound . iso8601ParseM
+
     fromDayToLocalTime :: Day -> LocalTime
     fromDayToLocalTime = (`LocalTime` TimeOfDay 23 59 59)
 
+    errMsg :: String
+    errMsg =
+        "Date format mismatch: only ISO 8601, yyyy-mm-dd, or yyyymmdd formats are allowed"
+
 textSetReader :: ReadM (HashSet Text)
 textSetReader =
-    maybeReader
-        $ fmap uniqueWords
-        . mfilter isValidFormat
-        . pure
+    eitherReader
+        $ liftA2
+            (bool $ Left errMsg)
+            (Right . uniqueWords)
+            isValidFormat
         . T.toUpper
         . T.strip
         . into
@@ -362,34 +379,45 @@ textSetReader =
     uniqueWords :: Text -> HashSet Text
     uniqueWords = HS.filter (not . T.null) . HS.fromList . T.splitOn " "
 
+    errMsg :: String
+    errMsg =
+        "List format mismatch: elements must be separated by spaces, and only the space character is allowed as whitespace"
+
 importanceReader :: (HasConfig) => ReadM Word
-importanceReader = maybeReader parseImportanceSyntax
+importanceReader = eitherReader parseImportanceSyntax
 
 importanceRangeReader :: (HasConfig) => ReadM (Interval Word)
-importanceRangeReader = maybeReader parseRange
+importanceRangeReader = eitherReader parseRange
   where
-    parseRange :: String -> Maybe (Interval Word)
+    parseRange :: String -> Either String (Interval Word)
     parseRange =
         LS.splitOn ".." >>> \case
             [l, u] ->
                 (<=..<=)
                     <$> parseBound NegInf (strip l)
                     <*> parseBound PosInf (strip u)
-            _ -> Nothing
+            _ -> Left "Range format mismatch: must be written in N..M format"
       where
-        parseBound :: Extended Word -> String -> Maybe (Extended Word)
-        parseBound defaultVal "" = Just defaultVal
+        parseBound :: Extended Word -> String -> Either String (Extended Word)
+        parseBound defaultVal "" = Right defaultVal
         parseBound _ s = Finite <$> parseImportanceSyntax s
 
         strip = L.dropWhile isSpace . L.dropWhileEnd isSpace
 
-parseImportanceSyntax :: (HasConfig) => String -> Maybe Word
+parseImportanceSyntax :: (HasConfig) => String -> Either String Word
 parseImportanceSyntax =
-    bool <$> readAlias . map toLower <*> Just . read <*> all isDigit
+    bool
+        <$> readAlias
+        . map toLower
+        <*> Right
+        . read
+        <*> all isDigit
   where
-    readAlias :: String -> Maybe Word
-    readAlias "low" = Just 2
-    readAlias "default" = Just $ ?config.importanceDefault
-    readAlias "important" = Just 6
-    readAlias "critical" = Just 8
-    readAlias _ = Nothing
+    readAlias :: String -> Either String Word
+    readAlias "low" = Right 2
+    readAlias "default" = Right $ ?config.importanceDefault
+    readAlias "important" = Right 6
+    readAlias "critical" = Right 8
+    readAlias _ =
+        Left
+            "Alias mismatch: only low, default, important, and critical are allowed as aliases"

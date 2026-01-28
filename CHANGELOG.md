@@ -17,6 +17,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Improved list status line to show priority orientation (`prio high at top/bottom`).
 - Emitted warning logs regardless of the global verbose flag.
 - Calculated string length for validation based on the number of wide characters included.
+- Added explicit error messages for invalid CLI inputs by replacing `maybeReader` with `eitherReader`.
 
 ### Fixed
 - Fixed table layout breaking when using wide characters such as Korean, Japanese, etc.
