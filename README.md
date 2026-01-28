@@ -9,7 +9,7 @@ Each command may define define its own flags, but several input rules or concept
 
 ## Concepts and Input Rules
 ### Task
-- A task consists of a required name and the following optional fields: deadline, status, tags, and memo.
+- A task consists of a required name and the following optional fields: importance, deadline, status, tags, and memo.
 - All fields except the name may be omitted.
 - Task names do not need to be unique, but non-unique names may make it difficult or impossible to identify a task by name or by a regular expression, especially for commands such as `edit` or `mark`.
 
@@ -21,6 +21,33 @@ Each command may define define its own flags, but several input rules or concept
 - A maximum of ten tags may be provided.
 - Duplicate tags are ignored.
 - Tag order is not significant.
+
+### Importance
+
+The `IMP.` field in `add` and `edit` commands accepts an integer from 1 to 9, where higher values indicate greater importance.
+
+Aliases:
+- `low` = 2
+- `default` = 4
+- `important` = 6
+- `critical` = 8
+
+If the importance option is not specified, it defaults to `default` (= 4).
+
+The `list` and `delete` commands support filtering by importance range using the `..` separator:
+- Format: `<lower>..<upper>`
+- Both bounds accept either a number (1-9) or an alias.
+- Either or both bounds may be omitted:
+  - Omitting the lower bound defaults to the minimum value (1)
+  - Omitting the upper bound defaults to the maximum value (9)
+- The range is **inclusive** on both ends (closed interval).
+
+Examples:
+- `2..6` — tasks with importance from 2 to 6
+- `low..8` — equivalent to `2..8`
+- `..5` — tasks with importance up to 5
+- `6..` — tasks with importance 6 or higher
+- `..` — all tasks (no filtering)
 
 ### Dates and Time
 The `DEADLINE` field accepts either a date or a full ISO-8601 **local** datetime.

@@ -29,12 +29,12 @@ import Data.HashSet qualified as HS
 import Data.IntMap qualified as IM
 import Data.Map qualified as M
 
-import Common.Prelude
 import Common.Serialization.CerealOrphans ()
 import Domain.Core.Task.Internal
 import Domain.Core.TaskId.Internal
 import Domain.Core.TodoRegistry.Raw
 import Domain.Error
+import External.Prelude
 
 initTodoRegistry :: TodoRegistry
 initTodoRegistry = TodoRegistry initIds IM.empty M.empty M.empty
@@ -122,8 +122,8 @@ getTasksWithAllTags tags reg@TodoRegistry{tagToId}
     | HS.null tags = getTasksMatching (const True) reg
     | otherwise =
         tags
-            & HS.map (\t -> M.findWithDefault HS.empty t tagToId & Intersection)
-            & foldr1 (<>)
+            & HS.map (\t -> M.findWithDefault HS.empty t tagToId)
+            & foldr1 HS.intersection
             & into
 
 getTasksMatching :: (TaskBasic -> Bool) -> TodoRegistry -> HashSet TaskId
@@ -136,18 +136,6 @@ getTasksMatching predicate TodoRegistry{idToTask} =
         | otherwise = set
 
 -- private
-
-newtype Intersection a = Intersection {getIntersection :: HashSet a}
-    deriving stock (Eq, Show)
-    deriving newtype (Hashable)
-
-instance (Eq a, Hashable a) => Semigroup (Intersection a) where
-    Intersection x <> Intersection y = Intersection (HS.intersection x y)
-
-instance From (Intersection a) (HashSet a)
-
-instance From (HashSet a) (Intersection a)
-
 getTasksByStatus :: TaskStatus -> TodoRegistry -> HashSet TaskId
 getTasksByStatus s TodoRegistry{statusToId} = M.findWithDefault HS.empty s statusToId
 

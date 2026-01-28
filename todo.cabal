@@ -5,7 +5,7 @@ cabal-version: 2.2
 -- see: https://github.com/sol/hpack
 
 name:           todo
-version:        2.1.0
+version:        3.0.0
 description:    Please see the README on GitHub at <https://github.com/Choi-Suhyeon/todoCli#readme>
 homepage:       https://github.com/Choi-Suhyeon/todoCli#readme
 bug-reports:    https://github.com/Choi-Suhyeon/todoCli/issues
@@ -35,8 +35,10 @@ library
       Common
       Common.AbstractError
       Common.Env
-      Common.Prelude
-      Common.Regex
+      Common.Env.Config
+      Common.Env.Config.Error
+      Common.Env.Runtime
+      Common.Log
       Common.Serialization
       Common.Serialization.CerealOrphans
       Domain
@@ -56,9 +58,12 @@ library
       Domain.TaskDetail
       Effect
       Effect.Error
-      Effect.Format
       Effect.Persistence
+      External.Interval
+      External.Prelude
+      External.Regex
       View
+      View.Format
   other-modules:
       Paths_todo
   autogen-modules:
@@ -100,22 +105,27 @@ library
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wredundant-constraints
   build-depends:
       base
-    , boxes
     , bytestring
     , cereal
     , containers
+    , data-interval
     , directory
     , file-embed
     , filepath
+    , formatting
     , hashable
     , mtl
     , optparse-applicative
     , regex-tdfa
+    , split
+    , table-layout
     , template-haskell
     , text
     , time
+    , tomland
     , transformers
     , unordered-containers
+    , vty
     , witch
   default-language: Haskell2010
 
@@ -162,22 +172,27 @@ executable todo
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base
-    , boxes
     , bytestring
     , cereal
     , containers
+    , data-interval
     , directory
     , file-embed
     , filepath
+    , formatting
     , hashable
     , mtl
     , optparse-applicative
     , regex-tdfa
+    , split
+    , table-layout
     , template-haskell
     , text
     , time
     , todo
+    , tomland
     , transformers
     , unordered-containers
+    , vty
     , witch
   default-language: Haskell2010

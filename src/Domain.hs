@@ -13,6 +13,8 @@ module Domain
     , TaskDetailDeadline (..)
     , TaskDetailStatus (..)
     , C.initTodoRegistry
+    , C.nameLenBound
+    , C.memoLenBound
     , getAllTasks
     , getTasksWithAllTags
     , getTasksByNameRegex
@@ -25,8 +27,10 @@ module Domain
     , markTask
     , deleteTasks
     , getTaskDetails
+    , getTasksWithinImportanceRange
     ) where
 
+import Control.Arrow ((>>>))
 import Data.HashSet (HashSet)
 import Data.Text (Text)
 
@@ -34,12 +38,12 @@ import Data.HashSet qualified as HS
 import Data.Text qualified as T
 
 import Common
-import Common.Prelude
 import Domain.Core
     ( EntryCreation (..)
     , EntryDeadline (..)
     , EntryPatch (..)
     , EntryStatus (..)
+    , Task
     , TaskBasic (..)
     , TaskId
     , TodoRegistry
@@ -47,6 +51,9 @@ import Domain.Core
 import Domain.Error
 import Domain.Log
 import Domain.TaskDetail
+import External.Interval (Interval, member)
+import External.Prelude hiding (log)
+import External.Regex
 
 import Domain.Core qualified as C
 
@@ -57,12 +64,16 @@ addTask
     => EntryCreation -> m ()
 addTask e = do
     reg <- get
-    Env{tz, now} <- ask
+    Runtime{..} <- asks (.runtime)
+    threshold <- asks (.config.dueWithinHours)
     newTask <- liftEitherInto $ C.mkTask tz now e
     reg' <- liftEitherInto $ C.insertTask newTask reg
 
+    let
+        taskInfo = renderTaskDetail tz $ toTaskDetail threshold now newTask
+
     put reg'
-    logMsg $ "task added:\n" <> renderTaskDetail tz (toTaskDetail now newTask)
+    logMsg LogInfo $ "task added:\n" <> taskInfo
 
 editTask
     :: (MonadDomainError e m, MonadEnv m, MonadLog m, MonadRegistry m)
@@ -70,7 +81,8 @@ editTask
     -> TaskId
     -> m ()
 editTask e tid = do
-    Env{..} <- ask
+    Runtime{..} <- asks (.runtime)
+    threshold <- asks (.config.dueWithinHours)
     reg <- get
 
     (oldTask, newTask) <- liftEitherInto do
@@ -80,16 +92,20 @@ editTask e tid = do
         pure (old, new)
 
     let
-        msgForOld = renderTaskDetail tz $ toTaskDetail now oldTask
-        msgForNew = renderTaskDetail tz $ toTaskDetail now newTask
+        msgForOld = renderTaskDetail tz $ toTaskDetail threshold now oldTask
+        msgForNew = renderTaskDetail tz $ toTaskDetail threshold now newTask
 
-    logMsg $ "task updated:\n  (old)\n" <> msgForOld <> "\n  (new)\n" <> msgForNew
+    logMsg LogInfo
+        $ "task updated:\n  (old)\n"
+        <> msgForOld
+        <> "\n  (new)\n"
+        <> msgForNew
     put $ C.replaceTask tid newTask reg
 
 markTask
     :: (MonadEnv m, MonadLog m, MonadRegistry m) => EntryStatus -> TaskId -> m ()
 markTask s tid = do
-    Env{tz, now} <- ask
+    Runtime{..} <- asks (.runtime)
     reg <- get
 
     when (C.isIdInUse tid reg) do
@@ -102,41 +118,50 @@ markTask s tid = do
                     , memo = Nothing
                     , tags = Nothing
                     , deadline = Nothing
+                    , importance = Nothing
                     , status = Just s
                     }
 
-        logMsg $ "task marked " <> (show s & into & T.toLower) <> ": '" <> name <> "'"
+        logMsg LogInfo
+            $ "task marked "
+            <> (show s & into & T.toLower)
+            <> ": '"
+            <> name
+            <> "'"
         put
             $ C.replaceTask tid (fromRight undefined $ C.modifyTask tz now entry task) reg
 
 deleteTasks
     :: (MonadEnv m, MonadLog m, MonadRegistry m) => HashSet TaskId -> m ()
 deleteTasks taskIds = do
-    Env{..} <- ask
+    Runtime{..} <- asks (.runtime)
+    threshold <- asks (.config.dueWithinHours)
     reg <- get
 
-    for_ taskIds
-        $ liftA2
-            when
-            isJust
-            ( logMsg
+    let
+        log :: (MonadLog m) => Maybe Task -> m ()
+        log =
+            logMsg LogInfo
                 . ("task deleted: " <>)
                 . renderTaskSummary
-                . (toTaskDetail now)
+                . (toTaskDetail threshold now)
                 . fromJust
-            )
-        . (`C.getTaskById` reg)
+
+    for_ taskIds $ liftA2 when isJust log . (`C.getTaskById` reg)
     put $ HS.foldl' (flip C.deleteTask) reg taskIds
 
 getTaskDetails
     :: (MonadEnv m, MonadRegistry m) => HashSet TaskId -> m [TaskDetail]
 getTaskDetails tids = do
-    Env{..} <- ask
+    Runtime{..} <- asks (.runtime)
+    threshold <- asks (.config.dueWithinHours)
     reg <- get
 
-    tids
-        & HS.toList
-        & mapMaybe ((toTaskDetail now <$>) . (`C.getTaskById` reg))
+    HS.toList tids
+        & mapMaybe
+            ( (`C.getTaskById` reg)
+                >>> fmap (toTaskDetail threshold now)
+            )
         & pure
 
 getAllTasks :: (MonadRegistry m) => m (HashSet TaskId)
@@ -149,18 +174,25 @@ getUndoneTasks :: (MonadRegistry m) => m (HashSet TaskId)
 getUndoneTasks = get >>= pure . C.getUndoneTasks
 
 getOverdueTasks :: (MonadEnv m, MonadRegistry m) => m (HashSet TaskId)
-getOverdueTasks = ask >>= \Env{now} -> get >>= pure . C.getTasksUndoneAnd (isOverdue now)
+getOverdueTasks =
+    asks (.runtime) >>= \Runtime{now} -> get >>= pure . C.getTasksUndoneAnd (isOverdue now)
 
 getDueTasks :: (MonadEnv m, MonadRegistry m) => m (HashSet TaskId)
-getDueTasks = ask >>= \Env{now} -> get >>= pure . C.getTasksUndoneAnd (isDue now)
+getDueTasks = do
+    now <- asks (.runtime.now)
+    threshold <- asks (.config.dueWithinHours)
+
+    get >>= pure . C.getTasksUndoneAnd (isDue threshold now)
 
 getTasksByNameRegex :: (MonadRegistry m) => Text -> m (HashSet TaskId)
-getTasksByNameRegex pattern =
-    get
-        >>= pure
-        . C.getTasksMatching (\TaskBasic{name} -> matchTest compiled (into @Text name))
+getTasksByNameRegex pattern = get >>= pure . C.getTasksMatching (matchTest compiled . into @Text . (.name))
   where
-    compiled = makeRegex pattern :: Regex
+    compiled :: Regex
+    compiled = makeRegex pattern
 
 getTasksWithAllTags :: (MonadRegistry m) => HashSet Text -> m (HashSet TaskId)
 getTasksWithAllTags tags = get >>= pure . C.getTasksWithAllTags tags
+
+getTasksWithinImportanceRange
+    :: (MonadRegistry m) => Interval Word -> m (HashSet TaskId)
+getTasksWithinImportanceRange range = get >>= pure . C.getTasksMatching ((`member` range) . (.importance))

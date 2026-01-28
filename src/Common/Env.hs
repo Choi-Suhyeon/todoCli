@@ -1,13 +1,17 @@
-module Common.Env (Env (..), MonadEnv) where
+module Common.Env
+    ( module Common.Env.Config
+    , module Common.Env.Runtime
+    , Env (..)
+    , MonadEnv
+    ) where
 
-import Data.Time.Clock (UTCTime)
-import Data.Time.LocalTime (TimeZone)
-
-import Common.Prelude
+import Common.Env.Config
+import Common.Env.Runtime
+import External.Prelude
 
 data Env = Env
-    { now :: !UTCTime
-    , tz :: !TimeZone
+    { config :: !Config
+    , runtime :: !Runtime
     }
     deriving (Eq, Ord, Show)
 

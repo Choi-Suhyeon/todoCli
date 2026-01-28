@@ -8,8 +8,8 @@ module Domain.Core.TaskId.Internal
 
 import Data.IntSet qualified as IS
 
-import Common.Prelude
 import Domain.Core.TaskId.Raw
+import External.Prelude
 
 initIds :: Ids
 initIds = Ids minBound IS.empty

@@ -1,20 +1,24 @@
+{-# LANGUAGE ImplicitParams #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
 
 module Main (main) where
 
-import Control.Exception (ErrorCall, evaluate, try)
+import Control.Arrow ((>>>))
+import Data.HashSet (HashSet)
+import Data.List.NonEmpty (nonEmpty)
 import Data.Text (Text)
 import Data.Time.Clock (getCurrentTime)
 import Data.Time.LocalTime (getCurrentTimeZone, localTimeToUTC)
+import Formatting (int, sformat, stext, (%))
 import System.Exit (exitFailure, exitSuccess)
 import System.IO (stderr)
+import System.IO.Error (ioeGetErrorType, isDoesNotExistErrorType)
 
 import Data.HashSet qualified as HS
 import Data.Text.IO qualified as TIO
 
 import CliParser
 import Common
-import Common.Prelude
 import Domain
 import Domain.Core
     ( checkIdInvariant
@@ -23,11 +27,15 @@ import Domain.Core
     , rebuildIds
     )
 import Effect
+import External.Prelude
 import View
 
-newtype App a = App
-    { unApp :: ReaderT Env (StateT TodoRegistry (ExceptT AppError (WriterT Log IO))) a
-    }
+type BaseM = ExceptT AppError (WriterT Log IO)
+
+runBaseM :: BaseM a -> IO (Either AppError a, Log)
+runBaseM = runWriterT . runExceptT
+
+newtype App a = App {unApp :: ReaderT Env (StateT TodoRegistry BaseM) a}
     deriving newtype
         ( Applicative
         , Functor
@@ -39,16 +47,33 @@ newtype App a = App
         , MonadWriter Log
         )
 
-runApp
-    :: Env -> TodoRegistry -> App a -> IO (Either AppError (a, TodoRegistry), Log)
-runApp env reg =
-    runWriterT . runExceptT . flip runStateT reg . flip runReaderT env . (.unApp)
+runAppM :: Env -> TodoRegistry -> App a -> BaseM (a, TodoRegistry)
+runAppM env reg = flip runStateT reg . flip runReaderT env . (.unApp)
+
+type MonadAppError m = MonadError AppError m
 
 data AppError
     = DomainE DomainError
     | EffectE EffectError
     | ParserE ParserError
     | StorageE StorageError
+    | ConfigE ConfigError
+
+instance Show AppError where
+    show (DomainE x) = "[E:Logic] " <> show x
+    show (EffectE x) = "[E:System] " <> show x
+    show (ParserE x) = "[E:Parser] " <> show x
+    show (StorageE x) = "[E:Storage] " <> show x
+    show (ConfigE x) = "[E:Config] " <> show x
+
+instance From DomainError AppError where
+    from = DomainE
+
+instance From EffectError AppError where
+    from = EffectE
+
+instance From ConfigError AppError where
+    from = ConfigE
 
 data ParserError
     = MultipleTargetsError
@@ -63,7 +88,9 @@ instance Show ParserError where
     show NoOptionsProvided = "At least one option is required"
 
 data StorageError = SerializationE String
-    deriving (Show)
+
+instance Show StorageError where
+    show (SerializationE x) = x
 
 instance From SerializationError StorageError where
     from (DeserializationFailed e) = SerializationE e
@@ -71,50 +98,85 @@ instance From SerializationError StorageError where
 instance From StorageError AppError where
     from = StorageE
 
-instance Show AppError where
-    show (DomainE x) = "[E:Logic] " <> show x
-    show (EffectE x) = "[E:System] " <> show x
-    show (ParserE x) = "[E:Parser] " <> show x
-    show (StorageE x) = "[E:Storage] " <> show x
-
-instance From DomainError AppError where
-    from = DomainE
-
-instance From EffectError AppError where
-    from = EffectE
+showErrWithoutTag :: AppError -> String
+showErrWithoutTag (DomainE x) = show x
+showErrWithoutTag (EffectE x) = show x
+showErrWithoutTag (ParserE x) = show x
+showErrWithoutTag (StorageE x) = show x
+showErrWithoutTag (ConfigE x) = show x
 
 main :: IO ()
 main = do
-    opts <- parseOpts
-    env <- initEnv
-    reg <- loadRegistry
-    (intermediate, logs) <- main' opts & runApp env reg
-    result <-
-        runExceptT
-            $ ExceptT (pure intermediate)
-            >>= writeData
-            . serialize
-            . UsingCereal
-            . snd
+    (res, logs) <- runBaseM do
+        config <- loadConfig
+        runtime <- initRuntime
+
+        let
+            ?config = config
+
+        let
+            env :: Env
+            env = Env{config, runtime}
+
+            writeWithCereal :: TodoRegistry -> BaseM ()
+            writeWithCereal = writeData . serialize . UsingCereal
+
+        reg0 <- loadRegistryWithBackup env
+        opts <- liftIO parseOpts
+        ((), reg1) <- runAppM env reg0 $ main' opts
+
+        writeWithCereal reg1
 
     let
         printLogsEndedWith :: Maybe Text -> IO ()
         printLogsEndedWith = TIO.hPutStr stderr . foldMap id . (logs <>) . into . maybeToList
 
-    case result of
+        getErrMsg :: AppError -> Text
+        getErrMsg = (<> "\n") . into . show
+
+    case res of
         Right () -> printLogsEndedWith Nothing *> exitSuccess
-        Left e -> printLogsEndedWith (show e & into & (<> "\n") & Just) *> exitFailure
+        Left e -> printLogsEndedWith (Just $ getErrMsg e) *> exitFailure
   where
-    initEnv :: IO Env
-    initEnv = do
-        now <- getCurrentTime
-        tz <- getCurrentTimeZone
+    initRuntime :: (MonadIO m) => m Runtime
+    initRuntime = do
+        now <- liftIO getCurrentTime
+        tz <- liftIO getCurrentTimeZone
 
-        pure Env{now, tz}
+        pure Runtime{now, tz}
 
-    loadRegistry :: (MonadIO m) => m TodoRegistry
-    loadRegistry =
-        fromRight initTodoRegistry <$> runExceptT do
+    loadConfig :: (MonadIO m, MonadLog m) => m Config
+    loadConfig = either onFail pure =<< runExceptT load
+      where
+        load :: (MonadIO m) => ExceptT AppError m Config
+        load = liftEitherInto . parseConfig =<< readConfig
+
+        onFail :: (MonadLog m) => AppError -> m Config
+        onFail = (pure initConfig <*) . logMsg LogWarning . warningMsg
+
+        warningMsg :: AppError -> Text
+        warningMsg = (<>) "Config loading failed: " . into . showErrWithoutTag
+
+    loadRegistryWithBackup
+        :: (MonadAppError m, MonadIO m, MonadLog m) => Env -> m TodoRegistry
+    loadRegistryWithBackup Env{runtime = Runtime{now}} =
+        loadRegistry >>= \case
+            Left e@(StorageE (SerializationE _)) -> do
+                let
+                    msg1, msg2 :: Text
+
+                    msg1 = "Registry deserialization failed: " <> into (showErrWithoutTag e)
+                    msg2 =
+                        "Attempting to back up the existing registry; if successful, a new registry will be created."
+
+                logMsg LogWarning msg1
+                logMsg LogWarning msg2
+                initTodoRegistry <$ backupData now
+            other -> liftEither other
+
+    loadRegistry :: (MonadIO m) => m (Either AppError TodoRegistry)
+    loadRegistry = do
+        result <- runExceptT do
             raw <- readData
             UsingCereal reg <-
                 raw
@@ -122,18 +184,20 @@ main = do
                     & first (into @StorageError)
                     & liftEitherInto @AppError
 
-            let
-                adjust =
-                    bool rebuildIds pure
-                        $ and
-                        $ map
-                            ($ reg)
-                            [ checkIdInvariant
-                            , checkTagIndexInvariant
-                            , checkStatusIndexInvariant
-                            ]
-
             liftEitherInto $ adjust reg
+
+        pure case result of
+            reg@(Right _) -> reg
+            err@(Left (EffectE (ReadFailed e)))
+                | isDoesNotExistErrorType $ ioeGetErrorType e -> Right initTodoRegistry
+                | otherwise -> err
+            err@(Left _) -> err
+      where
+        adjust :: TodoRegistry -> Either DomainError TodoRegistry
+        adjust = liftA3 bool rebuildIds pure (and . (<$> invariants) . (&))
+
+        invariants :: [TodoRegistry -> Bool]
+        invariants = [checkIdInvariant, checkTagIndexInvariant, checkStatusIndexInvariant]
 
 main' :: Options -> App ()
 main' Options{optCommand, verbose} = censor (bool (const mempty) id verbose) $ runCommand optCommand
@@ -146,50 +210,73 @@ runCommand (Mark x) = runMarkCommand x
 runCommand (Delete x) = runDeleteCommand x
 
 runAddCommand :: AddCommand -> App ()
-runAddCommand AddCommand{name, deadline, memo, tags} = do
-    optionDeadlineToEntryDeadline deadline >>= \utcDeadline -> addTask EntryCreation{name, memo, tags, deadline = utcDeadline}
+runAddCommand AddCommand{name, deadline, memo, tags, importance} =
+    optionDeadlineToEntryDeadline deadline
+        >>= \utcDeadline -> addTask EntryCreation{name, memo, tags, importance, deadline = utcDeadline}
 
 runListCommand :: ListCommand -> App ()
-runListCommand ListCommand{tags, status} = do
-    tz <- asks (.tz)
-    tasks' <- getTasksWithAllTags tags
-    tasks'' <- case status of
-        Nothing -> getAllTasks
-        Just s -> case s of
-            LstDone -> getDoneTasks
-            LstUndone -> getUndoneTasks
-            LstDue -> getDueTasks
-            LstOverdue -> getOverdueTasks
+runListCommand ListCommand{tags, status, importance, shouldReverse} = do
+    tz <- asks (.runtime.tz)
+    allTasks <- getAllTasks
+    tasks1 <- traverse getTasksWithAllTags tags
+    tasks2 <- traverse getTasksWithinImportanceRange importance
+    tasks3 <- (`traverse` status) \case
+        LstDone -> getDoneTasks
+        LstUndone -> getUndoneTasks
+        LstDue -> getDueTasks
+        LstOverdue -> getOverdueTasks
 
     snapshots <-
-        HS.intersection tasks' tasks''
+        [tasks1, tasks2, tasks3]
+            & catMaybes
+            & foldl' HS.intersection allTasks
+            & into
             & getTaskDetails
-            & fmap sortTaskDetails
+            & fmap (sortTaskDetails >>> bool id reverse shouldReverse)
 
-    liftIO . putStrLn $ renderTable (initTaskDetailRenderConfig tz) snapshots
-    pure ()
+    let
+        numOfSnapshots :: Int
+        numOfSnapshots = length snapshots
+
+        infoToShow :: Text
+        infoToShow =
+            sformat
+                (int % " task" % stext % " (prio high at " % stext % ")\n")
+                numOfSnapshots
+                (bool "" "s" (numOfSnapshots > 1))
+                (bool "bottom" "top" shouldReverse)
+
+        renderConfig :: TaskDetailRenderConfig
+        renderConfig = initTaskDetailRenderConfig tz infoToShow
+
+    liftIO . TIO.putStrLn $ renderTable renderConfig snapshots
 
 runEditCommand :: EditCommand -> App ()
-runEditCommand EditCommand{tgtName, name, deadline, memo, tags} = do
+runEditCommand EditCommand{tgtName, name, deadline, memo, tags, importance} = do
     target <- getUniqueTarget tgtName
     utcDeadline <- traverse optionDeadlineToEntryDeadline deadline
 
-    let
-        entryPatch =
-            EntryPatch
-                { name
-                , memo = (<$> memo) \case
-                    Remove -> ""
-                    Memo m -> m
-                , status = Nothing
-                , deadline = utcDeadline
-                , tags = case tags of
-                    Nothing -> Nothing
-                    Just Clear -> Just mempty
-                    Just (Substitute s) -> Just s
-                }
+    flip
+        editTask
+        target
+        EntryPatch
+            { name
+            , importance
+            , status = Nothing
+            , deadline = utcDeadline
+            , memo = processMemo memo
+            , tags = processTags tags
+            }
+  where
+    processMemo :: Maybe EditMemo -> Maybe Text
+    processMemo (Just Remove) = Just ""
+    processMemo (Just (Memo m)) = Just m
+    processMemo Nothing = Nothing
 
-    editTask entryPatch target
+    processTags :: Maybe EditTags -> Maybe (HashSet Text)
+    processTags (Just Clear) = Just mempty
+    processTags (Just (Substitute s)) = Just s
+    processTags Nothing = Nothing
 
 runMarkCommand :: MarkCommand -> App ()
 runMarkCommand (MrkDone tgtName) = getUniqueTarget tgtName >>= markTask EDone
@@ -197,31 +284,32 @@ runMarkCommand (MrkUndone tgtName) = getUniqueTarget tgtName >>= markTask EUndon
 
 runDeleteCommand :: DeleteCommand -> App ()
 runDeleteCommand DelAll = getAllTasks >>= deleteTasks
-runDeleteCommand DelBy{byName, byTags, byStatus} = do
-    tasks' <- traverse getTasksByNameRegex byName
-    tasks'' <- traverse getTasksWithAllTags byTags
-    tasks''' <- (`traverse` byStatus) \case
+runDeleteCommand DelBy{byName, byTags, byStatus, byImportance} = do
+    tasks1 <- traverse getTasksByNameRegex byName
+    tasks2 <- traverse getTasksWithAllTags byTags
+    tasks3 <- traverse getTasksWithinImportanceRange byImportance
+    tasks4 <- (`traverse` byStatus) \case
         DelDone -> getDoneTasks
         DelOverdue -> getOverdueTasks
 
     tasks <-
-        [tasks', tasks'', tasks''']
+        [tasks1, tasks2, tasks3, tasks4]
             & catMaybes
-            & foldr1 HS.intersection
-            & evaluate
-            & try @ErrorCall
-            & liftIO
-            >>= \case
-                Left _ -> throwError $ ParserE NoOptionsProvided
-                Right [] -> throwError $ ParserE DeletionTargetNotFound
-                Right xs -> pure xs
+            & nonEmpty
+            & fmap (foldr1 HS.intersection)
+            & handleResult
 
     deleteTasks tasks
+  where
+    handleResult :: Maybe (HashSet TaskId) -> App (HashSet TaskId)
+    handleResult Nothing = throwError $ ParserE NoOptionsProvided
+    handleResult (Just []) = throwError $ ParserE DeletionTargetNotFound
+    handleResult (Just xs) = pure xs
 
-getUniqueTarget :: (MonadError AppError m, MonadRegistry m) => Text -> m TaskId
+getUniqueTarget :: (MonadAppError m, MonadRegistry m) => Text -> m TaskId
 getUniqueTarget = getTasksByNameRegex >=> getFromSingleton
 
-getFromSingleton :: (Foldable f, MonadError AppError m) => f a -> m a
+getFromSingleton :: (Foldable f, MonadAppError m) => f a -> m a
 getFromSingleton = (. toList) \case
     [x] -> pure x
     [] -> throwError $ ParserE TargetNotFoundError
@@ -230,4 +318,4 @@ getFromSingleton = (. toList) \case
 optionDeadlineToEntryDeadline
     :: (MonadEnv m) => OptionDeadline -> m EntryDeadline
 optionDeadlineToEntryDeadline Boundless = pure EBoundless
-optionDeadlineToEntryDeadline (Bound d) = asks (.tz) >>= pure . EBound . (`localTimeToUTC` d)
+optionDeadlineToEntryDeadline (Bound d) = asks (.runtime.tz) >>= pure . EBound . (`localTimeToUTC` d)

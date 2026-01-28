@@ -1,11 +1,19 @@
 module Common.AbstractError
-    ( throwErrorInto
+    ( MonadErrorFrom
+    , MonadErrorFrom'
+    , throwErrorInto
     , liftEitherInto
     , liftEitherWith
     , liftEitherAs
     ) where
 
-import Common.Prelude
+import External.Prelude
+
+type MonadErrorFrom t e m = (From t e, MonadError e m)
+
+class (MonadErrorFrom t e m) => MonadErrorFrom' t e m
+
+instance (MonadErrorFrom t e m) => MonadErrorFrom' t e m
 
 throwErrorInto :: forall e t m a. (From t e, MonadError e m) => t -> m a
 throwErrorInto = throwError . into

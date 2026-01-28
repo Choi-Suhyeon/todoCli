@@ -3,7 +3,7 @@ module Common.Serialization (Serializable (..), UsingCereal (..), SerializationE
 import Data.ByteString (ByteString)
 import Data.Serialize (Serialize (..), decode, encode)
 
-import Common.Prelude
+import External.Prelude
 
 class Serializable a where
     serialize :: a -> ByteString

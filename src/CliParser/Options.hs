@@ -19,7 +19,8 @@ import Data.Time.LocalTime (LocalTime)
 
 import Data.Text qualified as T
 
-import Common.Prelude
+import External.Interval (Interval)
+import External.Prelude
 
 data Options = Options
     { optCommand :: Command
@@ -40,6 +41,7 @@ data AddCommand = AddCommand
     , deadline :: OptionDeadline
     , memo :: Text
     , tags :: HashSet Text
+    , importance :: Word
     }
     deriving (Show)
 
@@ -47,8 +49,10 @@ data OptionDeadline = Boundless | Bound LocalTime
     deriving (Show)
 
 data ListCommand = ListCommand
-    { tags :: HashSet Text
+    { tags :: Maybe (HashSet Text)
     , status :: Maybe ListStatus
+    , importance :: Maybe (Interval Word)
+    , shouldReverse :: Bool
     }
     deriving (Show)
 
@@ -58,6 +62,7 @@ data EditCommand = EditCommand
     , memo :: Maybe EditMemo
     , tags :: Maybe EditTags
     , deadline :: Maybe OptionDeadline
+    , importance :: Maybe Word
     }
     deriving (Show)
 
@@ -76,6 +81,7 @@ data DeleteCommand
         { byName :: Maybe Text
         , byTags :: Maybe (HashSet Text)
         , byStatus :: Maybe DeleteStatus
+        , byImportance :: Maybe (Interval Word)
         }
     deriving (Show)
 

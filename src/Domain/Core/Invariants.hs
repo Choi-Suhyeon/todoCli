@@ -10,12 +10,12 @@ import Data.IntMap qualified as IM
 import Data.IntSet qualified as IS
 import Data.Map qualified as M
 
-import Common.Prelude
 import Domain.Core.Task.Raw
 import Domain.Core.TaskId.Raw
 import Domain.Core.TodoRegistry.Internal
 import Domain.Core.TodoRegistry.Raw
 import Domain.Error
+import External.Prelude
 
 checkIdInvariant :: TodoRegistry -> Bool
 checkIdInvariant TodoRegistry{..}

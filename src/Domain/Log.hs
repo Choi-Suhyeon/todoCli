@@ -1,7 +1,6 @@
-module Domain.Log (MonadLog, Log, logMsg, renderTaskDetail, renderTaskSummary) where
+module Domain.Log (renderTaskDetail, renderTaskSummary) where
 
 import Data.HashSet (HashSet)
-import Data.Sequence (Seq)
 import Data.Text (Text)
 import Data.Time.Format.ISO8601 (iso8601Show)
 import Data.Time.LocalTime (TimeZone, utcToLocalTime)
@@ -10,24 +9,18 @@ import Data.HashSet qualified as HS
 import Data.List qualified as L
 import Data.Text qualified as T
 
-import Common.Prelude
 import Domain.TaskDetail
-
-type MonadLog m = MonadWriter Log m
-
-type Log = Seq Text
-
-logMsg :: (MonadLog m) => Text -> m ()
-logMsg = tell . into . L.singleton . ("[I] " <>) . (<> "\n")
+import External.Prelude
 
 renderTaskDetail :: TimeZone -> TaskDetail -> Text
-renderTaskDetail tz TaskDetail{name, status, deadline, tags, memo} =
+renderTaskDetail tz TaskDetail{name, status, deadline, tags, memo, importance} =
     T.unlines
-        [ "  name:     " <> name
-        , "  status:   " <> into (show status)
-        , "  deadline: " <> renderDeadline tz deadline
-        , "  tags:     " <> renderTags False tags
-        , "  memo:     " <> if T.null memo then "N/A" else memo
+        [ "  name:       " <> name
+        , "  status:     " <> into (show status)
+        , "  deadline:   " <> renderDeadline tz deadline
+        , "  importance: " <> into (show importance)
+        , "  tags:       " <> renderTags False tags
+        , "  memo:       " <> if T.null memo then "N/A" else memo
         ]
 
 renderTaskSummary :: TaskDetail -> Text

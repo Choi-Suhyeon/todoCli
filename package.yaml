@@ -5,22 +5,27 @@ data-files:
   - docs/todo.1
 dependencies:
   - base
-  - boxes
   - bytestring
   - cereal
   - containers
+  - data-interval
   - directory
   - file-embed
   - filepath
+  - formatting
   - hashable
   - mtl
   - optparse-applicative
   - regex-tdfa
+  - split
+  - table-layout
   - template-haskell
   - text
   - time
+  - tomland
   - transformers
   - unordered-containers
+  - vty
   - witch
 description: "Please see the README on GitHub at <https://github.com/Choi-Suhyeon/todoCli#readme>"
 executables:
@@ -117,4 +122,4 @@ library:
 license: BSD-3-Clause
 maintainer: "SUHYEON CHOI (1AzyF0x) <1AzyF0x@protonmail.ch>"
 name: todo
-version: '2.1.0'
+version: '3.0.0'

@@ -1,6 +1,6 @@
 let libName : Text = "todo"
 
-let version : Text = "2.1.0"
+let version : Text = "3.0.0"
 
 let githubRepo : Text = "Choi-Suhyeon/todoCli"
 
@@ -41,22 +41,27 @@ let ghcOptions : List Text =
 
 let dependencies : List Text =
     [ "base"
-    , "boxes"
     , "bytestring"
     , "cereal"
     , "containers"
+    , "data-interval"
     , "directory"
     , "file-embed"
     , "filepath"
+    , "formatting"
     , "hashable"
     , "mtl"
     , "optparse-applicative"
     , "regex-tdfa"
+    , "split"
+    , "table-layout"
     , "template-haskell"
     , "text"
     , "time"
+    , "tomland"
     , "transformers"
     , "unordered-containers"
+    , "vty"
     , "witch"
     ]
 

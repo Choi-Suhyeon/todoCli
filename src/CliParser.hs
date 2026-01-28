@@ -1,7 +1,9 @@
+{-# LANGUAGE ImplicitParams #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 module CliParser (module CliParser.Options, parseOpts) where
 
+import Control.Arrow ((>>>))
 import Data.ByteString (ByteString)
 import Data.FileEmbed (embedFile)
 import Data.HashSet (HashSet)
@@ -17,18 +19,22 @@ import Data.Version (showVersion)
 import Options.Applicative
 
 import Data.HashSet qualified as HS
+import Data.List qualified as L
+import Data.List.Split qualified as LS
 import Data.Text qualified as T
 import Data.Text.Encoding qualified as TE
 
 import CliParser.Options
-import Common.Prelude
-import Common.Regex
+import Common
+import External.Interval (Extended (..), Interval, (<=..<=))
+import External.Prelude
+import External.Regex
 import Paths_todo (version)
 
-parseOpts :: IO Options
+parseOpts :: (HasConfig) => IO Options
 parseOpts = execParser opts
 
-opts :: ParserInfo Options
+opts :: (HasConfig) => ParserInfo Options
 opts =
     info (pOptions <**> helper <**> longHelpOpt <**> versionOpt)
         $ fullDesc
@@ -54,7 +60,7 @@ longHelpOpt =
     longHelpRaw :: ByteString
     longHelpRaw = $(embedFile "docs/long-help.txt")
 
-pOptions :: Parser Options
+pOptions :: (HasConfig) => Parser Options
 pOptions = Options <$> pCommand <*> pVerbose
 
 pVerbose :: Parser Bool
@@ -64,7 +70,7 @@ pVerbose =
         <> long "verbose"
         <> help "Show verbose logs during processing"
 
-pCommand :: Parser Command
+pCommand :: (HasConfig) => Parser Command
 pCommand = hsubparser $ cAdd <> cList <> cEdit <> cMark <> cDelete
   where
     cAdd, cList, cEdit, cMark, cDelete :: Mod CommandFields Command
@@ -94,12 +100,12 @@ pCommand = hsubparser $ cAdd <> cList <> cEdit <> cMark <> cDelete
             $ info (Delete <$> pDeleteCommand)
             $ progDesc "Delete all tasks or delete selectively by filters"
 
-pAddCommand :: Parser AddCommand
-pAddCommand = AddCommand <$> pName <*> pDeadline <*> pMemo <*> pTags
+pAddCommand :: (HasConfig) => Parser AddCommand
+pAddCommand = AddCommand <$> pName <*> pDeadline <*> pMemo <*> pTags <*> pImportance
   where
     pName :: Parser Text
     pName =
-        option nameReader
+        option simpleTextReader
             $ short 'n'
             <> long "name"
             <> metavar "NAME"
@@ -117,7 +123,7 @@ pAddCommand = AddCommand <$> pName <*> pDeadline <*> pMemo <*> pTags
 
     pMemo :: Parser Text
     pMemo =
-        option descReader
+        option simpleTextReader
             $ short 'm'
             <> long "memo"
             <> metavar "MEMO"
@@ -133,17 +139,34 @@ pAddCommand = AddCommand <$> pName <*> pDeadline <*> pMemo <*> pTags
             <> help "Space-separated tags (maximum 10)"
             <> value HS.empty
 
-pListCommand :: Parser ListCommand
-pListCommand = ListCommand <$> pTags <*> pStatus
+    pImportance :: Parser Word
+    pImportance =
+        option importanceReader
+            $ short 'i'
+            <> long "importance"
+            <> metavar "IMP."
+            <> help helpMsg
+            <> value ?config.importanceDefault
+      where
+        helpMsg :: String
+        helpMsg =
+            mconcat
+                [ "Importance ranging from 1 to 9 (default: "
+                , show ?config.importanceDefault
+                , ")"
+                ]
+
+pListCommand :: (HasConfig) => Parser ListCommand
+pListCommand = ListCommand <$> pTags <*> pStatus <*> pImportance <*> pShouldReverse
   where
-    pTags :: Parser (HashSet Text)
+    pTags :: Parser (Maybe (HashSet Text))
     pTags =
-        option textSetReader
+        optional
+            $ option textSetReader
             $ short 't'
             <> long "tags"
             <> metavar "TAGS"
             <> help "Filter by tags (space-separated)"
-            <> value HS.empty
 
     pStatus :: Parser (Maybe ListStatus)
     pStatus =
@@ -154,8 +177,31 @@ pListCommand = ListCommand <$> pTags <*> pStatus
             <> metavar "STATUS"
             <> help "Filter by status (done, undone, due, overdue)"
 
-pEditCommand :: Parser EditCommand
-pEditCommand = EditCommand <$> pTgtName <*> pName <*> pMemo <*> pTags <*> pDeadline
+    pImportance :: Parser (Maybe (Interval Word))
+    pImportance =
+        optional
+            $ option importanceRangeReader
+            $ short 'i'
+            <> long "importance"
+            <> metavar "IMP."
+            <> help "Filter by importance range"
+
+    pShouldReverse :: Parser Bool
+    pShouldReverse =
+        switch
+            $ short 'r'
+            <> long "reverse"
+            <> help "Reverse the order of the list"
+
+pEditCommand :: (HasConfig) => Parser EditCommand
+pEditCommand =
+    EditCommand
+        <$> pTgtName
+        <*> pName
+        <*> pMemo
+        <*> pTags
+        <*> pDeadline
+        <*> pImportance
   where
     pTgtName :: Parser Text
     pTgtName = strArgument $ metavar "NAME_PATTERN"
@@ -163,7 +209,7 @@ pEditCommand = EditCommand <$> pTgtName <*> pName <*> pMemo <*> pTags <*> pDeadl
     pName :: Parser (Maybe Text)
     pName =
         optional
-            $ option nameReader
+            $ option simpleTextReader
             $ short 'n'
             <> long "name"
             <> metavar "NAME"
@@ -178,7 +224,7 @@ pEditCommand = EditCommand <$> pTgtName <*> pName <*> pMemo <*> pTags <*> pDeadl
                 <> long "clear-memo"
                 <> help "Clear the task memo"
         memo =
-            option (Memo <$> descReader)
+            option (Memo <$> simpleTextReader)
                 $ short 'm'
                 <> long "memo"
                 <> metavar "MEMO"
@@ -217,6 +263,15 @@ pEditCommand = EditCommand <$> pTgtName <*> pName <*> pMemo <*> pTags <*> pDeadl
                 <> help
                     "New deadline (YYYY-MM-DD or ISO 8601 datetime; time defaults to 23:59:59)"
 
+    pImportance :: Parser (Maybe Word)
+    pImportance =
+        optional
+            $ option importanceReader
+            $ short 'i'
+            <> long "importance"
+            <> metavar "IMP."
+            <> help "Importance ranging from 1 to 9"
+
 pMarkCommand :: Parser MarkCommand
 pMarkCommand =
     hsubparser
@@ -227,7 +282,7 @@ pMarkCommand =
     pName :: Parser Text
     pName = strArgument $ metavar "NAME_PATTERN"
 
-pDeleteCommand :: Parser DeleteCommand
+pDeleteCommand :: (HasConfig) => Parser DeleteCommand
 pDeleteCommand =
     hsubparser
         $ command "all" (info (pure DelAll) (progDesc "Delete all tasks"))
@@ -235,12 +290,12 @@ pDeleteCommand =
         <> metavar "COMMAND"
   where
     pDelBy :: Parser DeleteCommand
-    pDelBy = DelBy <$> pByName <*> pByTags <*> pByStatus
+    pDelBy = DelBy <$> pByName <*> pByTags <*> pByStatus <*> pByImportance
 
     pByName :: Parser (Maybe Text)
     pByName =
         optional
-            $ option nameReader
+            $ strOption
             $ short 'n'
             <> long "name"
             <> metavar "NAME_PATTERN"
@@ -264,39 +319,105 @@ pDeleteCommand =
             <> metavar "STATUS"
             <> help "Filter by task status (done, overdue)"
 
-nameReader :: ReadM Text
-nameReader = maybeReader $ liftA2 (bool Nothing) (Just . T.pack) ((<= 30) . length)
+    pByImportance :: Parser (Maybe (Interval Word))
+    pByImportance =
+        optional
+            $ option importanceRangeReader
+            $ short 'i'
+            <> long "importance"
+            <> metavar "IMP."
+            <> help "Filter by task importance"
 
-descReader :: ReadM Text
-descReader = maybeReader $ liftA2 (bool Nothing) (Just . T.pack) ((<= 60) . length)
+simpleTextReader :: ReadM Text
+simpleTextReader =
+    eitherReader $ liftA2 (bool $ Left errMsg) Right isValidFormat . T.strip . into
+  where
+    isValidFormat :: Text -> Bool
+    isValidFormat = (=~ ("^[^[:blank:]]+([[:blank:]][^[:blank:]]+)*$" :: Text))
+
+    errMsg :: String
+    errMsg = "Text format mismatch: multiple consecutive spaces are not allowed"
 
 datetimeReader :: ReadM OptionDeadline
 datetimeReader =
-    maybeReader
-        $ (<|>)
-        <$> fmap (Bound . fromDayToLocalTime)
-        . parseFormatExtension calendarFormat
-        <*> fmap Bound
-        . iso8601ParseM
+    eitherReader
+        $ maybeToEither errMsg
+        . asum
+        . flip
+            map
+            [ parseCalendarFormat
+            , parseISO8601Format
+            ]
+        . (&)
   where
+    parseCalendarFormat, parseISO8601Format :: String -> Maybe OptionDeadline
+
+    parseCalendarFormat = fmap (Bound . fromDayToLocalTime) . parseFormatExtension calendarFormat
+    parseISO8601Format = fmap Bound . iso8601ParseM
+
     fromDayToLocalTime :: Day -> LocalTime
     fromDayToLocalTime = (`LocalTime` TimeOfDay 23 59 59)
 
+    errMsg :: String
+    errMsg =
+        "Date format mismatch: only ISO 8601, yyyy-mm-dd, or yyyymmdd formats are allowed"
+
 textSetReader :: ReadM (HashSet Text)
 textSetReader =
-    maybeReader
-        $ mfilter isValidSetLen
-        . fmap uniqueWords
-        . mfilter isValidFormat
-        . pure
+    eitherReader
+        $ liftA2
+            (bool $ Left errMsg)
+            (Right . uniqueWords)
+            isValidFormat
         . T.toUpper
-        . T.pack
+        . T.strip
+        . into
   where
     isValidFormat :: Text -> Bool
-    isValidFormat = (=~ ("^ *[A-Z]{1,10}( +[A-Z]{1,10})* *$" :: Text))
-
-    isValidSetLen :: HashSet a -> Bool
-    isValidSetLen = liftA2 (&&) (> 0) (<= 4) . length
+    isValidFormat = (=~ ("^[^[:space:]]+( +[^[:space:]]+)*$" :: Text))
 
     uniqueWords :: Text -> HashSet Text
     uniqueWords = HS.filter (not . T.null) . HS.fromList . T.splitOn " "
+
+    errMsg :: String
+    errMsg =
+        "List format mismatch: elements must be separated by spaces, and only the space character is allowed as whitespace"
+
+importanceReader :: (HasConfig) => ReadM Word
+importanceReader = eitherReader parseImportanceSyntax
+
+importanceRangeReader :: (HasConfig) => ReadM (Interval Word)
+importanceRangeReader = eitherReader parseRange
+  where
+    parseRange :: String -> Either String (Interval Word)
+    parseRange =
+        LS.splitOn ".." >>> \case
+            [l, u] ->
+                (<=..<=)
+                    <$> parseBound NegInf (strip l)
+                    <*> parseBound PosInf (strip u)
+            _ -> Left "Range format mismatch: must be written in N..M format"
+      where
+        parseBound :: Extended Word -> String -> Either String (Extended Word)
+        parseBound defaultVal "" = Right defaultVal
+        parseBound _ s = Finite <$> parseImportanceSyntax s
+
+        strip = L.dropWhile isSpace . L.dropWhileEnd isSpace
+
+parseImportanceSyntax :: (HasConfig) => String -> Either String Word
+parseImportanceSyntax =
+    bool
+        <$> readAlias
+        . map toLower
+        <*> Right
+        . read
+        <*> all isDigit
+  where
+    readAlias :: String -> Either String Word
+    readAlias "low" = Right 2
+    readAlias "default" = Right $ ?config.importanceDefault
+    readAlias "important" = Right 6
+    readAlias "critical" = Right 8
+    readAlias _ =
+        Left
+            "Alias mismatch: only low, default, important, and critical are allowed as aliases"

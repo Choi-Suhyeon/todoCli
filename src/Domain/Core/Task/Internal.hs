@@ -17,6 +17,10 @@ module Domain.Core.Task.Internal
     , TaskBasicStatus (..)
     , TaskBasicDeadline (..)
 
+      -- * Public Value
+    , nameLenBound
+    , memoLenBound
+
       -- * Public(Domain) API
     , mkTask
     , modifyTask
@@ -27,16 +31,23 @@ import Data.HashSet (HashSet)
 import Data.Text (Text)
 import Data.Time.Clock (UTCTime (..))
 import Data.Time.LocalTime (TimeZone, utcToLocalTime)
+import Graphics.Text.Width (safeWctwidth)
 
-import Common.Prelude hiding (get, put)
+import Data.HashSet qualified as HS
+
 import Domain.Core.Task.Raw
 import Domain.Error
+import External.Interval (Extended (..), Interval, (<=..<=))
+import External.Prelude hiding (get, put)
+
+import External.Interval qualified as I
 
 data EntryCreation = EntryCreation
     { name :: !Text
     , memo :: !Text
     , tags :: !(HashSet Text)
     , deadline :: !EntryDeadline
+    , importance :: !Word
     }
     deriving (Show)
 
@@ -46,6 +57,7 @@ data EntryPatch = EntryPatch
     , tags :: !(Maybe (HashSet Text))
     , deadline :: !(Maybe EntryDeadline)
     , status :: !(Maybe EntryStatus)
+    , importance :: !(Maybe Word)
     }
     deriving (Show)
 
@@ -80,6 +92,7 @@ data TaskBasic = TaskBasic
     , tags :: !(HashSet Text)
     , status :: !TaskBasicStatus
     , deadline :: TaskBasicDeadline
+    , importance :: Word
     }
     deriving (Show)
 
@@ -115,34 +128,62 @@ instance Ord TaskBasicDeadline where
     compare (BBound _) BBoundless = LT
     compare (BBound d1) (BBound d2) = d1 `compare` d2
 
+nameLenBound :: Interval Int
+nameLenBound = Finite 1 <=..<= Finite 30
+
+memoLenBound :: Interval Int
+memoLenBound = Finite 0 <=..<= Finite 60
+
+tagSetLenBound :: Interval Int
+tagSetLenBound = Finite 0 <=..<= Finite 4
+
+tagLenBound :: Interval Int
+tagLenBound = Finite 1 <=..<= Finite 10
+
 mkTask :: TimeZone -> UTCTime -> EntryCreation -> Either DomainError Task
-mkTask tz now EntryCreation{..}
-    | EBound d <- deadline, Left e <- validateDeadline tz now d = Left e
-    | otherwise =
-        Right
-            Task
-                { name = into name
-                , memo = into memo
-                , tags = into tags
-                , deadline = into deadline
-                , status = Undone
-                }
+mkTask tz now EntryCreation{..} = do
+    case deadline of
+        EBound d -> validateDeadline tz now d
+        EBoundless -> pure ()
+
+    validateImportance importance
+    validateName name
+    validateMemo memo
+    validateTagCount tags
+    validateAllTagLength tags
+
+    pure
+        Task
+            { name = into name
+            , memo = into memo
+            , tags = into tags
+            , deadline = into deadline
+            , importance = into importance
+            , status = Undone
+            }
 
 modifyTask
     :: TimeZone -> UTCTime -> EntryPatch -> Task -> Either DomainError Task
-modifyTask tz now entry task
-    | Just (EBound d) <- entry.deadline
-    , Left e <- validateDeadline tz now d =
-        Left e
-    | otherwise =
-        Right
-            Task
-                { name = fromMaybe task.name $ into <$> entry.name
-                , memo = fromMaybe task.memo $ into <$> entry.memo
-                , tags = fromMaybe task.tags $ into <$> entry.tags
-                , deadline = fromMaybe task.deadline (into <$> entry.deadline)
-                , status = maybe task.status into entry.status
-                }
+modifyTask tz now entry task = do
+    case entry.deadline of
+        Just (EBound d) -> validateDeadline tz now d
+        _ -> pure ()
+
+    whenJust validateImportance entry.importance
+    whenJust validateName entry.name
+    whenJust validateMemo entry.memo
+    whenJust validateTagCount entry.tags
+    whenJust validateAllTagLength entry.tags
+
+    pure
+        Task
+            { name = maybe task.name into entry.name
+            , memo = maybe task.memo into entry.memo
+            , tags = maybe task.tags into entry.tags
+            , status = maybe task.status into entry.status
+            , deadline = maybe task.deadline into entry.deadline
+            , importance = maybe task.importance into entry.importance
+            }
 
 toTaskBasic :: Task -> TaskBasic
 toTaskBasic Task{..} =
@@ -152,6 +193,7 @@ toTaskBasic Task{..} =
         , tags = into tags
         , status = into status
         , deadline = into deadline
+        , importance = into importance
         }
 
 validateDeadline :: TimeZone -> UTCTime -> UTCTime -> Either DomainError ()
@@ -163,3 +205,43 @@ validateDeadline tz now dd
             ddL = utcToLocalTime tz dd
          in
             Left $ InvalidDeadline nowL ddL
+
+validateImportance :: Word -> Either DomainError ()
+validateImportance =
+    bool (Left ImportanceOutOfRange) (Right ())
+        . liftA2 (&&) (>= minBound) (<= maxBound)
+        . into @TaskImportance
+
+validateName :: Text -> Either DomainError ()
+validateName = liftA2 ensure (InvalidNameLength nameLenBound) id . safeWctwidth
+  where
+    ensure :: DomainError -> Int -> Either DomainError ()
+    ensure err = ensureInBound err nameLenBound
+
+validateMemo :: Text -> Either DomainError ()
+validateMemo = liftA2 ensure (InvalidMemoLength memoLenBound) id . safeWctwidth
+  where
+    ensure :: DomainError -> Int -> Either DomainError ()
+    ensure err = ensureInBound err memoLenBound
+
+validateTagCount :: HashSet Text -> Either DomainError ()
+validateTagCount = liftA2 ensure (InvalidTagCount tagSetLenBound) id . length
+  where
+    ensure :: DomainError -> Int -> Either DomainError ()
+    ensure err = ensureInBound err tagSetLenBound
+
+validateAllTagLength :: HashSet Text -> Either DomainError ()
+validateAllTagLength = (`HS.foldl'` Right ()) \acc tag ->
+    acc
+        *> ensureInBound
+            (InvalidTagLength tagLenBound)
+            tagLenBound
+            (safeWctwidth tag)
+
+whenJust :: (Applicative f) => (a -> f ()) -> Maybe a -> f ()
+whenJust = maybe (pure ())
+
+ensureInBound
+    :: (Ord a) => DomainError -> Interval a -> a -> Either DomainError ()
+ensureInBound err interval =
+    bool (Left err) (Right ()) . (`I.member` interval)

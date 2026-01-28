@@ -1,15 +1,23 @@
 module Effect.Error (MonadEffectError, EffectError (..)) where
 
-import Common.Prelude
+import Control.Exception (IOException)
+import System.IO.Error (ioeGetErrorType)
 
-type MonadEffectError e m = (MonadError e m, From EffectError e)
+import Common
+import External.Prelude
+
+type MonadEffectError e m = MonadErrorFrom EffectError e m
 
 data EffectError
     = GettingDataDirectoryFailed
-    | ReadFailed
-    | WriteFailed
+    | GettingConfigDirectoryFailed
+    | ReadFailed IOException
+    | WriteFailed IOException
+    | BackupFailed
 
 instance Show EffectError where
     show GettingDataDirectoryFailed = "Failed to find data storage directory"
-    show ReadFailed = "Failed to load data"
-    show WriteFailed = "Failed to save data"
+    show GettingConfigDirectoryFailed = "Failed to find configuration storage directory"
+    show (ReadFailed e) = "Failed to load data: " <> show (ioeGetErrorType e)
+    show (WriteFailed e) = "Failed to save data" <> show (ioeGetErrorType e)
+    show BackupFailed = "Failed to backup data"

@@ -5,6 +5,7 @@ module Domain.Core.Task.Raw
     , TaskStatus (..)
     , TaskTags (..)
     , TaskDeadline (..)
+    , TaskImportance (..)
     ) where
 
 import Data.HashSet (HashSet)
@@ -14,8 +15,8 @@ import Data.Text (Text)
 import Data.Time.Calendar (toModifiedJulianDay)
 import Data.Time.Clock (UTCTime (..))
 
-import Common.Prelude hiding (get, put)
 import Common.Serialization.CerealOrphans ()
+import External.Prelude hiding (get, put)
 
 data Task = Task
     { name :: !TaskName
@@ -23,6 +24,7 @@ data Task = Task
     , tags :: !TaskTags
     , status :: !TaskStatus
     , deadline :: !TaskDeadline
+    , importance :: !TaskImportance
     }
     deriving (Show)
 
@@ -33,19 +35,20 @@ instance Serialize Task where
         put tags
         put status
         put deadline
+        put importance
 
-    get = Task <$> get <*> get <*> get <*> get <*> get
+    get = Task <$> get <*> get <*> get <*> get <*> get <*> get
 
 newtype TaskName = TaskName {unTaskName :: Text}
     deriving stock (Eq, Ord, Show)
-    deriving (Hashable, IsString, Serialize) via Text
+    deriving newtype (Hashable, IsString, Serialize)
 
 instance From Text TaskName
 instance From TaskName Text
 
 newtype TaskMemo = TaskMemo {unTaskMemo :: Text}
     deriving stock (Eq, Ord, Show)
-    deriving (Hashable, IsString, Serialize) via Text
+    deriving newtype (Hashable, IsString, Serialize)
 
 instance From Text TaskMemo
 instance From TaskMemo Text
@@ -97,3 +100,14 @@ instance Serialize TaskDeadline where
             0 -> pure Boundless
             1 -> Bound <$> get
             _ -> fail "TaskDeadline: invalid tag"
+
+newtype TaskImportance = TaskImportance {unTaskImportance :: Word}
+    deriving stock (Eq, Ord, Show)
+    deriving newtype (Hashable, Serialize)
+
+instance From Word TaskImportance
+instance From TaskImportance Word
+
+instance Bounded TaskImportance where
+    minBound = TaskImportance 1
+    maxBound = TaskImportance 9

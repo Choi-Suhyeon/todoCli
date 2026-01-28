@@ -8,6 +8,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 _No unreleased changes yet._
 
+## [3.0.0] - 2026-01-28
+
+### Added
+- Added importance as a task component.
+- Added importance range filtering to list and delete subcommands.
+- Added `list --reverse` option.
+- Added support for user-defined program configuration via `config.toml` (parsed as TOML 0.5).
+
+### Changed
+- Added version information to registry serialization. On deserialization failure, the existing data is backed up and a new registry is created.
+- Improved list status line to show priority orientation (`prio high at top/bottom`).
+- Emitted warning logs regardless of the global verbose flag.
+- Calculated string length for validation based on the number of wide characters included.
+- Added explicit error messages for invalid CLI inputs by replacing `maybeReader` with `eitherReader`.
+
+### Fixed
+- Fixed table layout breaking when using wide characters such as Korean, Japanese, etc.
+
 ## [2.1.0] - 2026-01-06
 
 ### Added

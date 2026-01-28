@@ -11,6 +11,13 @@ packages:
       size: 165530
   original:
     hackage: fourmolu-0.17.0.0
+- completed:
+    hackage: table-layout-1.0.0.2@sha256:d1d7fb2afb618bed9c749c0873011f746f2448c3cd45b704380f8768b449af29,7880
+    pantry-tree:
+      sha256: 5598d41b5adfccd33d131eea1fda290ea4e7b6629ab91e15417bccba4d4a76dd
+      size: 2547
+  original:
+    hackage: table-layout-1.0.0.2@sha256:d1d7fb2afb618bed9c749c0873011f746f2448c3cd45b704380f8768b449af29,7880
 snapshots:
 - completed:
     sha256: bbf3ee712864f4cbd6dc0c9355f9edf6fa191e69fadb0fc46bc047ec63f1a2c0

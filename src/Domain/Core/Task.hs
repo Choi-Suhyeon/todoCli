@@ -13,6 +13,10 @@ module Domain.Core.Task
     , TaskBasicStatus (..)
     , TaskBasicDeadline (..)
 
+      -- * Public Value
+    , nameLenBound
+    , memoLenBound
+
       -- * Public(Domain) API
     , mkTask
     , modifyTask

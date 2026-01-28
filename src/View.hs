@@ -1,20 +1,37 @@
-module View (initTaskDetailRenderConfig, sortTaskDetails) where
+module View
+    ( TaskDetailRenderConfig
+    , initTaskDetailRenderConfig
+    , sortTaskDetails
+    , renderTable
+    ) where
 
 import Data.List (sort, sortBy)
 import Data.Ord (Down (..), comparing)
+import Data.Text (Text)
 import Data.Time.Format.ISO8601 (iso8601Show)
 import Data.Time.LocalTime (TimeZone, utcToLocalTime)
-import Witch
+import Text.Layout.Table
+    ( column
+    , expandBetween
+    , fixed
+    , fixedUntil
+    , left
+    , noAlign
+    , noCutMark
+    )
 
 import Data.Text qualified as T
 
-import Common.Prelude
 import Domain
     ( TaskDetail (..)
     , TaskDetailDeadline (..)
     , TaskDetailStatus (..)
+    , memoLenBound
+    , nameLenBound
     )
-import Effect.Format
+import View.Format
+import External.Interval (Interval, fromFinite, upperIntegralBound)
+import External.Prelude
 
 data ColNameTaskDetail
     = CNStatus
@@ -22,6 +39,7 @@ data ColNameTaskDetail
     | CNTags
     | CNName
     | CNMemo
+    | CNImportance
     deriving (Eq)
 
 instance Show ColNameTaskDetail where
@@ -30,50 +48,65 @@ instance Show ColNameTaskDetail where
     show CNTags = "Tags"
     show CNName = "Name"
     show CNMemo = "Memo"
+    show CNImportance = "IMP."
 
-initTaskDetailRenderConfig
-    :: TimeZone -> RenderConfig ColNameTaskDetail TaskDetail
-initTaskDetailRenderConfig tz =
+type TaskDetailRenderConfig = RenderConfig TaskDetail
+
+initTaskDetailRenderConfig :: TimeZone -> Text -> TaskDetailRenderConfig
+initTaskDetailRenderConfig tz moreInfo =
     RenderConfig
-        { vSpace = 0
-        , cellMinWidth = 6
+        { moreInfo
         , cols =
-            [ Column CNStatus 1 False renderStatus
-            , Column CNName 2 False renderName
-            , Column CNDeadline 2 True renderDeadline
-            , Column CNTags 2 True renderTags
-            , Column CNMemo 2 True renderMemo
+            [ Column "ST." renderStatus
+                $ column (fixed 3) left noAlign noCutMark
+            , Column "IMP." renderImportance
+                $ column (fixed 4) left noAlign noCutMark
+            , Column "Name" renderName
+                $ column (expandBetween 4 $ getMaxLen nameLenBound) left noAlign noCutMark
+            , Column "Deadline" renderDeadline
+                $ column (fixedUntil 8) left noAlign noCutMark
+            , Column "Tags" renderTags
+                $ column (fixedUntil 4) left noAlign noCutMark
+            , Column "Memo" renderMemo
+                $ column (expandBetween 4 $ getMaxLen memoLenBound) left noAlign noCutMark
             ]
         }
   where
-    renderStatus :: TaskDetail -> String
+    getMaxLen :: Interval Int -> Int
+    getMaxLen = fromJust . fromFinite . upperIntegralBound
+
+    renderStatus :: TaskDetail -> Text
     renderStatus TaskDetail{status = DOverdue} = "[X]"
     renderStatus TaskDetail{status = DDue} = "[!]"
     renderStatus TaskDetail{status = DUndone} = "[U]"
     renderStatus TaskDetail{status = DDone} = "[O]"
 
-    renderName :: TaskDetail -> String
-    renderName TaskDetail{name = n} = into n
+    renderName :: TaskDetail -> Text
+    renderName TaskDetail{name = n} = n
 
-    renderDeadline :: TaskDetail -> String
+    renderDeadline :: TaskDetail -> Text
     renderDeadline TaskDetail{deadline = DBoundless} = "N/A"
-    renderDeadline TaskDetail{deadline = DBound d} = d & utcToLocalTime tz & iso8601Show
+    renderDeadline TaskDetail{deadline = DBound d} = utcToLocalTime tz d & iso8601Show & into
 
-    renderTags :: TaskDetail -> String
+    renderTags :: TaskDetail -> Text
     renderTags TaskDetail{tags = ts}
         | null ts = "N/A"
-        | otherwise = toList ts & sort & T.intercalate ", " & into
+        | otherwise = toList ts & sort & T.intercalate ", "
 
-    renderMemo :: TaskDetail -> String
+    renderMemo :: TaskDetail -> Text
     renderMemo TaskDetail{memo = m}
         | T.null m = "N/A"
         | otherwise = into m
 
+    renderImportance :: TaskDetail -> Text
+    renderImportance TaskDetail{importance = i} = into $ show i
+
 sortTaskDetails :: [TaskDetail] -> [TaskDetail]
 sortTaskDetails =
     sortBy
-        $ comparing (\t -> t.status)
-        <> comparing (Down . (\t -> t.deadline))
-        <> comparing (length . (\t -> t.tags))
-        <> comparing (T.length . (\t -> t.name))
-        <> comparing (T.length . (\t -> t.memo))
+        $ comparing (.status)
+        <> comparing (.importance)
+        <> comparing (Down . (.deadline))
+        <> comparing (length . (.tags))
+        <> comparing (T.length . (.name))
+        <> comparing (T.length . (.memo))

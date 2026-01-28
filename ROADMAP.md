@@ -11,9 +11,3 @@
 - Add a `--interactive` global flag.
 - Require user approval when performing any destructive action.
 - Enquire about the intended target when multiple targets are selected in the `edit` and `mark` commands.
-
-## Milestone 2: Adding the Importance Property
-
-- Add an importance property to tasks to represent priority independent of deadlines.
-- Support importance values from `0` (default) to `9` (highest).
-- Add aliases for common importance levels.
