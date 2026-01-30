@@ -18,4 +18,4 @@ instance (Serialize a) => Serializable (UsingCereal a) where
 data SerializationError = DeserializationFailed String
 
 instance Show SerializationError where
-    show (DeserializationFailed s) = "Deserialization failed: " <> s
+    show (DeserializationFailed s) = "Deserialization failed: " <> takeWhile (/= '\n') s

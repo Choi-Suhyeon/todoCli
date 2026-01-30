@@ -1,6 +1,13 @@
 {-# LANGUAGE ImplicitParams #-}
 
-module Common.Env.Config (HasConfig, Config (..), ConfigError (..), initConfig, parseConfig) where
+module Common.Env.Config
+    ( HasConfig
+    , Config (..)
+    , ConfigError (..)
+    , initConfig
+    , encodeConfig
+    , decodeConfig
+    ) where
 
 import Data.ByteString (ByteString)
 import Data.Text (Text)
@@ -23,8 +30,11 @@ data Config = Config
 initConfig :: Config
 initConfig = Config{importanceDefault = 4, dueWithinHours = 48}
 
-parseConfig :: ByteString -> Either ConfigError Config
-parseConfig = decodeUtf8 >=> decodeToml
+encodeConfig :: Config -> ByteString
+encodeConfig = TE.encodeUtf8 . Toml.encode configCodec
+
+decodeConfig :: ByteString -> Either ConfigError Config
+decodeConfig = decodeUtf8 >=> decodeToml
   where
     decodeUtf8 :: ByteString -> Either ConfigError Text
     decodeUtf8 = first (const Utf8DecodingFailed) . TE.decodeUtf8'

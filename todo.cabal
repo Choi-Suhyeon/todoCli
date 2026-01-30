@@ -5,7 +5,7 @@ cabal-version: 2.2
 -- see: https://github.com/sol/hpack
 
 name:           todo
-version:        3.0.0
+version:        3.0.1
 description:    Please see the README on GitHub at <https://github.com/Choi-Suhyeon/todoCli#readme>
 homepage:       https://github.com/Choi-Suhyeon/todoCli#readme
 bug-reports:    https://github.com/Choi-Suhyeon/todoCli/issues
@@ -60,6 +60,7 @@ library
       Effect.Error
       Effect.Persistence
       External.Interval
+      External.ISO8601
       External.Prelude
       External.Regex
       View

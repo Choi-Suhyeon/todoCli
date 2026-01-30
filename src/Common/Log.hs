@@ -1,29 +1,90 @@
-module Common.Log (MonadLog, Log, LogType (..), logMsg) where
+module Common.Log
+    ( MonadLog
+    , Log
+    , DiagLevel (..)
+    , logOutput
+    , logInfo
+    , logWarning
+    , logError
+    , printLog
+    , printLogExcept
+    ) where
 
 import Data.Sequence (Seq)
 import Data.Text (Text)
+import System.IO (stderr, stdout)
 
-import Data.List qualified as L
+import Data.Sequence qualified as SQ
+import Data.Text qualified as T
+import Data.Text.IO qualified as TIO
 
 import External.Prelude
 
 type MonadLog m = MonadWriter Log m
 
-type Log = Seq Text
+data Log = Log
+    { out :: Seq Text
+    , diag :: Seq Diagnostic
+    }
 
-data LogType
-    = LogWarning
-    | LogInfo
+instance Semigroup Log where
+    l1 <> l2 =
+        Log
+            { out = l1.out <> l2.out
+            , diag = l1.diag <> l2.diag
+            }
 
-instance Show LogType where
-    show LogWarning = "[W]"
-    show LogInfo = "[I]"
+instance Monoid Log where
+    mempty = Log{out = mempty, diag = mempty}
 
-logMsg :: (MonadLog m) => LogType -> Text -> m ()
-logMsg t l = tell . toSeq $ toTextType t <> l <> "\n"
+data Diagnostic = Diagnostic
+    { level :: DiagLevel
+    , message :: Text
+    }
+
+data DiagLevel
+    = DiagInfo
+    | DiagWarning
+    | DiagError
+    deriving (Eq)
+
+renderDiagLevelTag :: DiagLevel -> Text
+renderDiagLevelTag DiagInfo = "[I]"
+renderDiagLevelTag DiagWarning = "[W]"
+renderDiagLevelTag DiagError = "[E]"
+
+logOutput, logInfo, logWarning, logError :: (MonadLog m) => Text -> m ()
+logOutput m = tell Log{diag = mempty, out = [m]}
+logInfo = logDiagnostic DiagInfo
+logWarning = logDiagnostic DiagWarning
+logError = logDiagnostic DiagError
+
+printLog :: (DiagLevel -> Bool) -> Log -> IO ()
+printLog prefixNeeded = printLogExcept prefixNeeded Nothing
+
+printLogExcept
+    :: (Foldable f) => (DiagLevel -> Bool) -> f DiagLevel -> Log -> IO ()
+printLogExcept prefixNeeded exclusion Log{out, diag} = do
+    printDiag diag
+    traverse_ (TIO.hPutStrLn stdout) $ out
   where
-    toSeq :: Text -> Seq Text
-    toSeq = into . L.singleton
+    printDiag :: Seq Diagnostic -> IO ()
+    printDiag =
+        liftA2 unless T.null (TIO.hPutStr stderr . (<> "\n\n"))
+            . foldMap id
+            . SQ.intersperse "\n"
+            . fmap toText
+            . SQ.filter ((`notElem` exclusion) . (.level))
 
-    toTextType :: LogType -> Text
-    toTextType = (<> " ") . into . show
+    toText :: Diagnostic -> Text
+    toText = toTextOfDiagnostic <$> prefixNeeded . (.level) <*> id
+
+logDiagnostic :: (MonadLog m) => DiagLevel -> Text -> m ()
+logDiagnostic level message = tell Log{out = mempty, diag = [Diagnostic{level, message}]}
+
+toTextOfDiagnostic :: Bool -> Diagnostic -> Text
+toTextOfDiagnostic prefixEnabled Diagnostic{level, message} =
+    (<> message)
+        if prefixEnabled
+            then renderDiagLevelTag level <> " "
+            else ""

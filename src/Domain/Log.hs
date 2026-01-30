@@ -2,7 +2,6 @@ module Domain.Log (renderTaskDetail, renderTaskSummary) where
 
 import Data.HashSet (HashSet)
 import Data.Text (Text)
-import Data.Time.Format.ISO8601 (iso8601Show)
 import Data.Time.LocalTime (TimeZone, utcToLocalTime)
 
 import Data.HashSet qualified as HS
@@ -10,6 +9,7 @@ import Data.List qualified as L
 import Data.Text qualified as T
 
 import Domain.TaskDetail
+import External.ISO8601 (iso8601ShowNoFrac)
 import External.Prelude
 
 renderTaskDetail :: TimeZone -> TaskDetail -> Text
@@ -35,7 +35,7 @@ renderTaskSummary TaskDetail{name, status, tags} =
 
 renderDeadline :: TimeZone -> TaskDetailDeadline -> Text
 renderDeadline _ DBoundless = "N/A"
-renderDeadline tz (DBound d) = utcToLocalTime tz d & iso8601Show & T.pack
+renderDeadline tz (DBound d) = utcToLocalTime tz d & iso8601ShowNoFrac & T.pack
 
 renderTags :: Bool -> HashSet Text -> Text
 renderTags delimRequired tags

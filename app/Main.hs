@@ -11,11 +11,9 @@ import Data.Time.Clock (getCurrentTime)
 import Data.Time.LocalTime (getCurrentTimeZone, localTimeToUTC)
 import Formatting (int, sformat, stext, (%))
 import System.Exit (exitFailure, exitSuccess)
-import System.IO (stderr)
 import System.IO.Error (ioeGetErrorType, isDoesNotExistErrorType)
 
 import Data.HashSet qualified as HS
-import Data.Text.IO qualified as TIO
 
 import CliParser
 import Common
@@ -34,6 +32,9 @@ type BaseM = ExceptT AppError (WriterT Log IO)
 
 runBaseM :: BaseM a -> IO (Either AppError a, Log)
 runBaseM = runWriterT . runExceptT
+
+withLoggedError :: BaseM a -> BaseM a
+withLoggedError = (`catchError` liftA2 (>>) (logError . into . show) throwError)
 
 newtype App a = App {unApp :: ReaderT Env (StateT TodoRegistry BaseM) a}
     deriving newtype
@@ -107,37 +108,34 @@ showErrWithoutTag (ConfigE x) = show x
 
 main :: IO ()
 main = do
-    (res, logs) <- runBaseM do
+    (initVals, logs0) <- runBaseM $ withLoggedError do
         config <- loadConfig
         runtime <- initRuntime
 
         let
             ?config = config
 
-        let
-            env :: Env
-            env = Env{config, runtime}
-
-            writeWithCereal :: TodoRegistry -> BaseM ()
-            writeWithCereal = writeData . serialize . UsingCereal
-
-        reg0 <- loadRegistryWithBackup env
         opts <- liftIO parseOpts
+
+        pure (Env{config, runtime}, opts)
+
+    (env, opts) <-
+        either (const $ printLog' False logs0 >> exitFailure) pure initVals
+
+    (res, logs1) <- runBaseM $ withLoggedError do
+        reg0 <- loadRegistryWithBackup env
         ((), reg1) <- runAppM env reg0 $ main' opts
 
-        writeWithCereal reg1
+        UsingCereal reg1 & serialize & writeData
 
-    let
-        printLogsEndedWith :: Maybe Text -> IO ()
-        printLogsEndedWith = TIO.hPutStr stderr . foldMap id . (logs <>) . into . maybeToList
-
-        getErrMsg :: AppError -> Text
-        getErrMsg = (<> "\n") . into . show
-
-    case res of
-        Right () -> printLogsEndedWith Nothing *> exitSuccess
-        Left e -> printLogsEndedWith (Just $ getErrMsg e) *> exitFailure
+    printLog' opts.verbose $ logs0 <> logs1
+    bool exitFailure exitSuccess $ isRight res
   where
+    printLog' :: Bool -> Log -> IO ()
+    printLog' verbose
+        | verbose = printLog (/= DiagError)
+        | otherwise = printLogExcept (/= DiagError) (Just DiagInfo)
+
     initRuntime :: (MonadIO m) => m Runtime
     initRuntime = do
         now <- liftIO getCurrentTime
@@ -148,14 +146,34 @@ main = do
     loadConfig :: (MonadIO m, MonadLog m) => m Config
     loadConfig = either onFail pure =<< runExceptT load
       where
-        load :: (MonadIO m) => ExceptT AppError m Config
-        load = liftEitherInto . parseConfig =<< readConfig
+        load :: (MonadAppError m, MonadIO m) => m Config
+        load = liftEitherInto . decodeConfig =<< readConfig
 
-        onFail :: (MonadLog m) => AppError -> m Config
-        onFail = (pure initConfig <*) . logMsg LogWarning . warningMsg
+        onFail :: forall m. (MonadIO m, MonadLog m) => AppError -> m Config
+        onFail err =
+            pure err
+                >! createDefaultIfMissing
+                >>= (logWarning . failedToLoad)
+                >> pure initConfig
+          where
+            createDefaultIfMissing :: AppError -> m ()
+            createDefaultIfMissing (EffectE (ReadFailed e)) =
+                when
+                    (isDoesNotExistErrorType $ ioeGetErrorType e)
+                    ( (>>=)
+                        (runExceptT $ writeConfig @AppError $ encodeConfig initConfig)
+                        (either (logWarning . failedToWriteConfig) (const $ pure ()))
+                    )
+            createDefaultIfMissing _ = pure ()
 
-        warningMsg :: AppError -> Text
-        warningMsg = (<>) "Config loading failed: " . into . showErrWithoutTag
+            failedToLoad :: AppError -> Text
+            failedToLoad = warningMsg "Config loading failed: "
+
+            failedToWriteConfig :: AppError -> Text
+            failedToWriteConfig = warningMsg "Config file creation failed: "
+
+            warningMsg :: Text -> AppError -> Text
+            warningMsg d e = d <> into (showErrWithoutTag e)
 
     loadRegistryWithBackup
         :: (MonadAppError m, MonadIO m, MonadLog m) => Env -> m TodoRegistry
@@ -169,8 +187,8 @@ main = do
                     msg2 =
                         "Attempting to back up the existing registry; if successful, a new registry will be created."
 
-                logMsg LogWarning msg1
-                logMsg LogWarning msg2
+                logWarning msg1
+                logWarning msg2
                 initTodoRegistry <$ backupData now
             other -> liftEither other
 
@@ -200,7 +218,7 @@ main = do
         invariants = [checkIdInvariant, checkTagIndexInvariant, checkStatusIndexInvariant]
 
 main' :: Options -> App ()
-main' Options{optCommand, verbose} = censor (bool (const mempty) id verbose) $ runCommand optCommand
+main' Options{optCommand} = runCommand optCommand
 
 runCommand :: Command -> App ()
 runCommand (Add x) = runAddCommand x
@@ -249,7 +267,7 @@ runListCommand ListCommand{tags, status, importance, shouldReverse} = do
         renderConfig :: TaskDetailRenderConfig
         renderConfig = initTaskDetailRenderConfig tz infoToShow
 
-    liftIO . TIO.putStrLn $ renderTable renderConfig snapshots
+    logOutput $ renderTable renderConfig snapshots
 
 runEditCommand :: EditCommand -> App ()
 runEditCommand EditCommand{tgtName, name, deadline, memo, tags, importance} = do

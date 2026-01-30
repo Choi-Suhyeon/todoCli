@@ -8,7 +8,6 @@ module View
 import Data.List (sort, sortBy)
 import Data.Ord (Down (..), comparing)
 import Data.Text (Text)
-import Data.Time.Format.ISO8601 (iso8601Show)
 import Data.Time.LocalTime (TimeZone, utcToLocalTime)
 import Text.Layout.Table
     ( column
@@ -29,9 +28,10 @@ import Domain
     , memoLenBound
     , nameLenBound
     )
-import View.Format
+import External.ISO8601 (iso8601ShowNoFrac)
 import External.Interval (Interval, fromFinite, upperIntegralBound)
 import External.Prelude
+import View.Format
 
 data ColNameTaskDetail
     = CNStatus
@@ -86,7 +86,7 @@ initTaskDetailRenderConfig tz moreInfo =
 
     renderDeadline :: TaskDetail -> Text
     renderDeadline TaskDetail{deadline = DBoundless} = "N/A"
-    renderDeadline TaskDetail{deadline = DBound d} = utcToLocalTime tz d & iso8601Show & into
+    renderDeadline TaskDetail{deadline = DBound d} = utcToLocalTime tz d & iso8601ShowNoFrac & into
 
     renderTags :: TaskDetail -> Text
     renderTags TaskDetail{tags = ts}
