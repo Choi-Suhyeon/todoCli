@@ -60,6 +60,7 @@ library
       Effect.Error
       Effect.Persistence
       External.Interval
+      External.ISO8601
       External.Prelude
       External.Regex
       View

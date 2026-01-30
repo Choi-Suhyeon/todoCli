@@ -1,11 +1,10 @@
 module Domain.Error (MonadDomainError, DomainError (..)) where
 
-import Data.Time.Format.ISO8601 (iso8601Show)
 import Data.Time.LocalTime (LocalTime)
-import Formatting (formatToString, int, string, (%+))
-import Text.Printf (printf)
+import Formatting (Format, formatToString, int, string, (%), (%+))
 
 import Common
+import External.ISO8601 (iso8601ShowNoFrac)
 import External.Interval (Interval)
 import External.Prelude
 
@@ -27,17 +26,19 @@ data DomainError
 instance Show DomainError where
     show EmptyTitle = "Title must not be empty"
     show TaskNotFound = "The specified task could not be found"
-    show (InvalidDeadline c v) =
-        printf
-            "Deadline must be in the future (current: %s, input: %s)"
-            (iso8601Show c)
-            (iso8601Show v)
     show TaskIdExhausted = "No available task ID: maximum capacity reached"
     show ImportanceOutOfRange = "Importance value is out of valid range"
     show (InvalidNameLength i l) = lengthOutOfRange "Name length" i l
     show (InvalidMemoLength i l) = lengthOutOfRange "Memo length" i l
     show (InvalidTagCount i l) = lengthOutOfRange "Tag count" i l
     show (InvalidTagLength i) = simpleLengthOutOfRange "Tag length" i
+    show (InvalidDeadline c v) = (formatToString formatStr `on` iso8601ShowNoFrac) c v
+      where
+        formatStr :: Format String (String -> String -> String)
+        formatStr = baseMsg %+ detailsFmt
+          where
+            baseMsg = "Deadline must be in the future"
+            detailsFmt = "(current:" %+ string % ", input:" %+ string % ")"
 
 lengthOutOfRange :: String -> Interval Int -> Int -> String
 lengthOutOfRange elemName interval len =

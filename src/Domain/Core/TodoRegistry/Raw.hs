@@ -33,4 +33,4 @@ instance Serialize TodoRegistry where
     get =
         getWord16le >>= \case
             1 -> TodoRegistry <$> get <*> get <*> get <*> get
-            n -> fail $ "unknown version: " <> show n
+            n -> fail $ "unknown registry version: " <> show n

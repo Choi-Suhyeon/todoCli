@@ -3,7 +3,6 @@ module Effect.Persistence (readData, readConfig, writeData, backupData) where
 import Control.Exception (IOException, bracketOnError)
 import Data.ByteString (ByteString, hPutStr, readFile)
 import Data.Time.Clock (UTCTime)
-import Data.Time.Format.ISO8601 (iso8601Show)
 import System.Directory
     ( XdgDirectory (..)
     , createDirectoryIfMissing
@@ -18,6 +17,7 @@ import Text.Printf (printf)
 
 import Common
 import Effect.Error
+import External.ISO8601 (iso8601Show)
 import External.Prelude hiding (readFile)
 
 readData :: (MonadEffectError e m, MonadIO m) => m ByteString

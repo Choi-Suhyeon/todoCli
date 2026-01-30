@@ -9,11 +9,6 @@ import Data.FileEmbed (embedFile)
 import Data.HashSet (HashSet)
 import Data.Text (Text)
 import Data.Time.Calendar (Day (..))
-import Data.Time.Format.ISO8601
-    ( calendarFormat
-    , iso8601ParseM
-    , parseFormatExtension
-    )
 import Data.Time.LocalTime (LocalTime (..), TimeOfDay (..))
 import Data.Version (showVersion)
 import Options.Applicative
@@ -26,6 +21,7 @@ import Data.Text.Encoding qualified as TE
 
 import CliParser.Options
 import Common
+import External.ISO8601 (calendarFormat, iso8601ParseM, parseFormatExtension)
 import External.Interval (Extended (..), Interval, (<=..<=))
 import External.Prelude
 import External.Regex
