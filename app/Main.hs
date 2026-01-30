@@ -146,14 +146,34 @@ main = do
     loadConfig :: (MonadIO m, MonadLog m) => m Config
     loadConfig = either onFail pure =<< runExceptT load
       where
-        load :: (MonadIO m) => ExceptT AppError m Config
-        load = liftEitherInto . parseConfig =<< readConfig
+        load :: (MonadAppError m, MonadIO m) => m Config
+        load = liftEitherInto . decodeConfig =<< readConfig
 
-        onFail :: (MonadLog m) => AppError -> m Config
-        onFail = (pure initConfig <*) . logWarning . warningMsg
+        onFail :: forall m. (MonadIO m, MonadLog m) => AppError -> m Config
+        onFail err =
+            pure err
+                >! createDefaultIfMissing
+                >>= (logWarning . failedToLoad)
+                >> pure initConfig
+          where
+            createDefaultIfMissing :: AppError -> m ()
+            createDefaultIfMissing (EffectE (ReadFailed e)) =
+                when
+                    (isDoesNotExistErrorType $ ioeGetErrorType e)
+                    ( (>>=)
+                        (runExceptT $ writeConfig @AppError $ encodeConfig initConfig)
+                        (either (logWarning . failedToWriteConfig) (const $ pure ()))
+                    )
+            createDefaultIfMissing _ = pure ()
 
-        warningMsg :: AppError -> Text
-        warningMsg = (<>) "Config loading failed: " . into . showErrWithoutTag
+            failedToLoad :: AppError -> Text
+            failedToLoad = warningMsg "Config loading failed: "
+
+            failedToWriteConfig :: AppError -> Text
+            failedToWriteConfig = warningMsg "Config file creation failed: "
+
+            warningMsg :: Text -> AppError -> Text
+            warningMsg d e = d <> into (showErrWithoutTag e)
 
     loadRegistryWithBackup
         :: (MonadAppError m, MonadIO m, MonadLog m) => Env -> m TodoRegistry

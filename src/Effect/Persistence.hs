@@ -1,8 +1,15 @@
-module Effect.Persistence (readData, readConfig, writeData, backupData) where
+module Effect.Persistence
+    ( readConfig
+    , readData
+    , writeConfig
+    , writeData
+    , backupData
+    ) where
 
 import Control.Exception (IOException, bracketOnError)
 import Data.ByteString (ByteString, hPutStr, readFile)
 import Data.Time.Clock (UTCTime)
+import Formatting (Format, formatToString, string, (%))
 import System.Directory
     ( XdgDirectory (..)
     , createDirectoryIfMissing
@@ -13,18 +20,20 @@ import System.Directory
     )
 import System.FilePath ((<.>), (</>))
 import System.IO (hClose, openBinaryTempFile)
-import Text.Printf (printf)
 
 import Common
 import Effect.Error
 import External.ISO8601 (iso8601Show)
 import External.Prelude hiding (readFile)
 
+readConfig :: (MonadEffectError e m, MonadIO m) => m ByteString
+readConfig = readRaw getConfigDirectory configFileName
+
 readData :: (MonadEffectError e m, MonadIO m) => m ByteString
 readData = readRaw getDataDirectory dataFileName
 
-readConfig :: (MonadEffectError e m, MonadIO m) => m ByteString
-readConfig = readRaw getConfigDirectory configFileName
+writeConfig :: (MonadEffectError e m, MonadIO m) => ByteString -> m ()
+writeConfig = writeRaw getConfigDirectory configFileName
 
 writeData :: (MonadEffectError e m, MonadIO m) => ByteString -> m ()
 writeData = writeRaw getDataDirectory dataFileName
@@ -87,13 +96,16 @@ backupRawAt dir file now =
     oldFilePath, newFilePath :: FilePath
 
     oldFilePath = dir </> file
-    newFilePath = dir </> printf ".%s_%s" nowStr file <.> "bak"
+    newFilePath = dir </> formatToString fileNameFmt nowStr file
+      where
+        fileNameFmt :: Format String (String -> String -> String)
+        fileNameFmt = "." % string % "_" % string % ".bak"
 
-    nowStr :: String
-    nowStr = map (replaceToDot ":-") $ iso8601Show now
+        nowStr :: String
+        nowStr = map (replaceToDot ":-") $ iso8601Show now
 
-    replaceToDot :: String -> Char -> Char
-    replaceToDot targets = bool '.' <$> id <*> (`notElem` targets)
+        replaceToDot :: String -> Char -> Char
+        replaceToDot targets = bool '.' <$> id <*> (`notElem` targets)
 
 getDirectory
     :: (MonadEffectError e m, MonadIO m)
