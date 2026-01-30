@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+_No unreleased changes yet._
+
+## [3.0.1] - 2026-01-31
+
 ### Fixed
 - Fixed config loading to auto-create file with defaults when missing, instead of silently using defaults for all load failures
 

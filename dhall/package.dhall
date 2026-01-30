@@ -1,6 +1,6 @@
 let libName : Text = "todo"
 
-let version : Text = "3.0.0"
+let version : Text = "3.0.1"
 
 let githubRepo : Text = "Choi-Suhyeon/todoCli"
 
