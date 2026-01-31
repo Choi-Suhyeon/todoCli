@@ -10,6 +10,7 @@ module CliParser.Options
     , MarkCommand (..)
     , DeleteCommand (..)
     , ListStatus (..)
+    , ListColumns (..)
     , DeleteStatus (..)
     ) where
 
@@ -53,6 +54,7 @@ data ListCommand = ListCommand
     , status :: Maybe ListStatus
     , importance :: Maybe (Interval Word)
     , shouldReverse :: Bool
+    , columns :: Maybe [ListColumns]
     }
     deriving (Show)
 
@@ -90,14 +92,34 @@ data ListStatus = LstDone | LstUndone | LstDue | LstOverdue
 
 instance Read ListStatus where
     readsPrec _ str = case T.toUpper tgt of
-        "DONE" -> [(LstDone, restLtrimmed)]
-        "UNDONE" -> [(LstUndone, restLtrimmed)]
-        "DUE" -> [(LstDue, restLtrimmed)]
-        "OVERDUE" -> [(LstOverdue, restLtrimmed)]
+        "DONE" -> [(LstDone, rest)]
+        "UNDONE" -> [(LstUndone, rest)]
+        "DUE" -> [(LstDue, rest)]
+        "OVERDUE" -> [(LstOverdue, rest)]
         _ -> []
       where
-        (tgt, rest) = T.break isSpace . T.pack $ str
-        restLtrimmed = T.unpack . T.stripStart $ rest
+        (tgt, rest) = splitFirstWord str
+
+data ListColumns
+    = LstName
+    | LstMemo
+    | LstTags
+    | LstDeadline
+    | LstStatus
+    | LstImportance
+    deriving (Show)
+
+instance Read ListColumns where
+    readsPrec _ str = case T.toUpper tgt of
+        "NAME" -> [(LstName, rest)]
+        "MEMO" -> [(LstMemo, rest)]
+        "TAGS" -> [(LstTags, rest)]
+        "DEADLINE" -> [(LstDeadline, rest)]
+        "STATUS" -> [(LstStatus, rest)]
+        "IMPORTANCE" -> [(LstImportance, rest)]
+        _ -> []
+      where
+        (tgt, rest) = splitFirstWord str
 
 data DeleteStatus
     = DelDone
@@ -106,9 +128,11 @@ data DeleteStatus
 
 instance Read DeleteStatus where
     readsPrec _ str = case T.toUpper tgt of
-        "DONE" -> [(DelDone, restLtrimmed)]
-        "OVERDUE" -> [(DelOverdue, restLtrimmed)]
+        "DONE" -> [(DelDone, rest)]
+        "OVERDUE" -> [(DelOverdue, rest)]
         _ -> []
       where
-        (tgt, rest) = T.break isSpace . T.pack $ str
-        restLtrimmed = T.unpack . T.stripStart $ rest
+        (tgt, rest) = splitFirstWord str
+
+splitFirstWord :: String -> (Text, String)
+splitFirstWord = second (into . T.stripStart) . T.break isSpace . into

@@ -6,7 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
-_No unreleased changes yet._
+### Added
+- Improved the `list` subcommand by allowing users to customize displayed columns, either explicitly with `--columns` or via predefined presets.
 
 ## [3.0.1] - 2026-01-31
 

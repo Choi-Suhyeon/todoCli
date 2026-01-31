@@ -12,6 +12,7 @@ import Data.Time.Calendar (Day (..))
 import Data.Time.LocalTime (LocalTime (..), TimeOfDay (..))
 import Data.Version (showVersion)
 import Options.Applicative
+import Text.Read (readEither)
 
 import Data.HashSet qualified as HS
 import Data.List qualified as L
@@ -153,8 +154,21 @@ pAddCommand = AddCommand <$> pName <*> pDeadline <*> pMemo <*> pTags <*> pImport
                 ]
 
 pListCommand :: (HasConfig) => Parser ListCommand
-pListCommand = ListCommand <$> pTags <*> pStatus <*> pImportance <*> pShouldReverse
+pListCommand =
+    ListCommand
+        <$> pTags
+        <*> pStatus
+        <*> pImportance
+        <*> pShouldReverse
+        <*> pColumns
   where
+    pShouldReverse :: Parser Bool
+    pShouldReverse =
+        switch
+            $ short 'r'
+            <> long "reverse"
+            <> help "Reverse the order of the list"
+
     pTags :: Parser (Maybe (HashSet Text))
     pTags =
         optional
@@ -182,12 +196,29 @@ pListCommand = ListCommand <$> pTags <*> pStatus <*> pImportance <*> pShouldReve
             <> metavar "IMP."
             <> help "Filter by importance range"
 
-    pShouldReverse :: Parser Bool
-    pShouldReverse =
-        switch
-            $ short 'r'
-            <> long "reverse"
-            <> help "Reverse the order of the list"
+    pColumns :: Parser (Maybe [ListColumns])
+    pColumns = optional $ pDefault <|> aliasNotes <|> aliasSummary <|> aliasOverview
+      where
+        pDefault =
+            option listColumnsReader
+                $ long "columns"
+                <> metavar "COLS"
+                <> help "Select columns to display (comma-separated)"
+
+        aliasNotes =
+            flag' [LstStatus, LstName, LstMemo]
+                $ long "notes"
+                <> help "Preset: status, name, memo"
+
+        aliasSummary =
+            flag' [LstStatus, LstImportance, LstName, LstDeadline]
+                $ long "summary"
+                <> help "Preset: status, importance, name, deadline"
+
+        aliasOverview =
+            flag' [LstStatus, LstImportance, LstName, LstDeadline, LstTags]
+                $ long "overview"
+                <> help "Preset: status, importance, name, deadline, tags"
 
 pEditCommand :: (HasConfig) => Parser EditCommand
 pEditCommand =
@@ -417,3 +448,13 @@ parseImportanceSyntax =
     readAlias _ =
         Left
             "Alias mismatch: only low, default, important, and critical are allowed as aliases"
+
+listColumnsReader :: ReadM [ListColumns]
+listColumnsReader =
+    eitherReader
+        $ first ("Invalid column name: " <>)
+        . traverse (readEither' @ListColumns)
+        . LS.splitOn ","
+  where
+    readEither' :: (Read a) => String -> Either String a
+    readEither' = liftA2 first const readEither

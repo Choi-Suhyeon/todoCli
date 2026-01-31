@@ -8,18 +8,18 @@ import Data.Text qualified as T
 
 import External.Prelude
 
-data Column a = Column
-    { name :: Text
-    , render :: a -> Text
+data Column a b = Column
+    { name :: a
+    , render :: b -> Text
     , spec :: ColSpec
     }
 
-data RenderConfig a = RenderConfig
-    { cols :: [Column a]
+data RenderConfig a b = RenderConfig
+    { cols :: [Column a b]
     , moreInfo :: Text
     }
 
-renderTable :: forall a. RenderConfig a -> [a] -> Text
+renderTable :: forall a b. (Show a) => RenderConfig a b -> [b] -> Text
 renderTable RenderConfig{..} = renderWithInfo . (:) wideTextHeaders . fmap toBody
   where
     renderWithInfo :: [Row WideText] -> Text
@@ -27,18 +27,18 @@ renderTable RenderConfig{..} = renderWithInfo . (:) wideTextHeaders . fmap toBod
       where
         info = liftA3 bool ("\n" <>) id T.null moreInfo
 
-    toBody :: a -> [WideText]
+    toBody :: b -> [WideText]
     toBody = (<$> rendersToWideText) . (&)
 
-    rendersToWideText :: [a -> WideText]
+    rendersToWideText :: [b -> WideText]
     rendersToWideText = map (WideText .) renders
 
     wideTextHeaders :: [WideText]
     wideTextHeaders = map WideText headers
 
-    renders :: [a -> Text]
+    renders :: [b -> Text]
     headers :: [Text]
     specs :: [ColSpec]
 
     (renders, headers, specs) =
-        unzip3 $ liftA3 (,,) (.render) (.name) (.spec) <$> cols
+        unzip3 $ liftA3 (,,) (.render) (into . show . (.name)) (.spec) <$> cols

@@ -1,5 +1,7 @@
 module View
     ( TaskDetailRenderConfig
+    , ViewColName (..)
+    , initTaskDetailRenderConfigWith
     , initTaskDetailRenderConfig
     , sortTaskDetails
     , renderTable
@@ -33,7 +35,7 @@ import External.Interval (Interval, fromFinite, upperIntegralBound)
 import External.Prelude
 import View.Format
 
-data ColNameTaskDetail
+data ViewColName
     = CNStatus
     | CNDeadline
     | CNTags
@@ -42,7 +44,7 @@ data ColNameTaskDetail
     | CNImportance
     deriving (Eq)
 
-instance Show ColNameTaskDetail where
+instance Show ViewColName where
     show CNStatus = "ST."
     show CNDeadline = "Deadline"
     show CNTags = "Tags"
@@ -50,24 +52,30 @@ instance Show ColNameTaskDetail where
     show CNMemo = "Memo"
     show CNImportance = "IMP."
 
-type TaskDetailRenderConfig = RenderConfig TaskDetail
+type TaskDetailRenderConfig = RenderConfig ViewColName TaskDetail
+
+initTaskDetailRenderConfigWith
+    :: (ViewColName -> Bool) -> TimeZone -> Text -> TaskDetailRenderConfig
+initTaskDetailRenderConfigWith p tz moreInfo = initConfig{cols = filter (p . (.name)) initConfig.cols}
+  where
+    initConfig = initTaskDetailRenderConfig tz moreInfo
 
 initTaskDetailRenderConfig :: TimeZone -> Text -> TaskDetailRenderConfig
 initTaskDetailRenderConfig tz moreInfo =
     RenderConfig
         { moreInfo
         , cols =
-            [ Column "ST." renderStatus
+            [ Column CNStatus renderStatus
                 $ column (fixed 3) left noAlign noCutMark
-            , Column "IMP." renderImportance
+            , Column CNImportance renderImportance
                 $ column (fixed 4) left noAlign noCutMark
-            , Column "Name" renderName
+            , Column CNName renderName
                 $ column (expandBetween 4 $ getMaxLen nameLenBound) left noAlign noCutMark
-            , Column "Deadline" renderDeadline
+            , Column CNDeadline renderDeadline
                 $ column (fixedUntil 8) left noAlign noCutMark
-            , Column "Tags" renderTags
+            , Column CNTags renderTags
                 $ column (fixedUntil 4) left noAlign noCutMark
-            , Column "Memo" renderMemo
+            , Column CNMemo renderMemo
                 $ column (expandBetween 4 $ getMaxLen memoLenBound) left noAlign noCutMark
             ]
         }

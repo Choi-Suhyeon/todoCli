@@ -233,7 +233,7 @@ runAddCommand AddCommand{name, deadline, memo, tags, importance} =
         >>= \utcDeadline -> addTask EntryCreation{name, memo, tags, importance, deadline = utcDeadline}
 
 runListCommand :: ListCommand -> App ()
-runListCommand ListCommand{tags, status, importance, shouldReverse} = do
+runListCommand ListCommand{tags, status, importance, columns, shouldReverse} = do
     tz <- asks (.runtime.tz)
     allTasks <- getAllTasks
     tasks1 <- traverse getTasksWithAllTags tags
@@ -265,7 +265,12 @@ runListCommand ListCommand{tags, status, importance, shouldReverse} = do
                 (bool "bottom" "top" shouldReverse)
 
         renderConfig :: TaskDetailRenderConfig
-        renderConfig = initTaskDetailRenderConfig tz infoToShow
+        renderConfig = renderConfig' columns tz infoToShow
+          where
+            renderConfig' =
+                maybe
+                    initTaskDetailRenderConfig
+                    (initTaskDetailRenderConfigWith . flip elem . map toViewColName)
 
     logOutput $ renderTable renderConfig snapshots
 
@@ -337,3 +342,11 @@ optionDeadlineToEntryDeadline
     :: (MonadEnv m) => OptionDeadline -> m EntryDeadline
 optionDeadlineToEntryDeadline Boundless = pure EBoundless
 optionDeadlineToEntryDeadline (Bound d) = asks (.runtime.tz) >>= pure . EBound . (`localTimeToUTC` d)
+
+toViewColName :: ListColumns -> ViewColName
+toViewColName LstName = CNName
+toViewColName LstMemo = CNMemo
+toViewColName LstTags = CNTags
+toViewColName LstStatus = CNStatus
+toViewColName LstDeadline = CNDeadline
+toViewColName LstImportance = CNImportance
