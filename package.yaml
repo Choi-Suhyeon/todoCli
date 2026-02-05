@@ -15,6 +15,8 @@ dependencies:
   - formatting
   - hashable
   - mtl
+  - nonempty-vector
+  - number-length
   - optparse-applicative
   - regex-tdfa
   - split

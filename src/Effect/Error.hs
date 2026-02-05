@@ -14,6 +14,7 @@ data EffectError
     | ReadFailed IOException
     | WriteFailed IOException
     | BackupFailed
+    | InvalidUserInput String
 
 instance Show EffectError where
     show GettingDataDirectoryFailed = "Failed to find data storage directory"
@@ -21,3 +22,4 @@ instance Show EffectError where
     show (ReadFailed e) = "Failed to load data: " <> show (ioeGetErrorType e)
     show (WriteFailed e) = "Failed to save data" <> show (ioeGetErrorType e)
     show BackupFailed = "Failed to backup data"
+    show (InvalidUserInput t) = "Invalid user input: " <> into t

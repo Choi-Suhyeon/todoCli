@@ -27,6 +27,7 @@ module Domain
     , markTask
     , deleteTasks
     , getTaskDetails
+    , getOneTaskDetail
     , getTasksWithinImportanceRange
     ) where
 
@@ -34,7 +35,6 @@ import Control.Arrow ((>>>))
 import Data.HashSet (HashSet)
 import Data.Text (Text)
 
-import Data.HashSet qualified as HS
 import Data.Text qualified as T
 
 import Common
@@ -132,7 +132,7 @@ markTask s tid = do
             $ C.replaceTask tid (fromRight undefined $ C.modifyTask tz now entry task) reg
 
 deleteTasks
-    :: (MonadEnv m, MonadLog m, MonadRegistry m) => HashSet TaskId -> m ()
+    :: (Foldable f, MonadEnv m, MonadLog m, MonadRegistry m) => f TaskId -> m ()
 deleteTasks taskIds = do
     Runtime{..} <- asks (.runtime)
     threshold <- asks (.config.dueWithinHours)
@@ -148,21 +148,30 @@ deleteTasks taskIds = do
                 . fromJust
 
     for_ taskIds $ liftA2 when isJust log . (`C.getTaskById` reg)
-    put $ HS.foldl' (flip C.deleteTask) reg taskIds
+    put $ foldl' (flip C.deleteTask) reg taskIds
 
 getTaskDetails
-    :: (MonadEnv m, MonadRegistry m) => HashSet TaskId -> m [TaskDetail]
+    :: (Foldable f, MonadEnv m, MonadRegistry m) => f TaskId -> m [TaskDetail]
 getTaskDetails tids = do
     Runtime{..} <- asks (.runtime)
     threshold <- asks (.config.dueWithinHours)
     reg <- get
 
-    HS.toList tids
+    toList tids
         & mapMaybe
             ( (`C.getTaskById` reg)
                 >>> fmap (toTaskDetail threshold now)
             )
         & pure
+
+getOneTaskDetail
+    :: (MonadEnv m, MonadRegistry m) => TaskId -> m (Maybe TaskDetail)
+getOneTaskDetail tid = do
+    Runtime{..} <- asks (.runtime)
+    threshold <- asks (.config.dueWithinHours)
+    reg <- get
+
+    pure $ toTaskDetail threshold now <$> C.getTaskById tid reg
 
 getAllTasks :: (MonadRegistry m) => m (HashSet TaskId)
 getAllTasks = get >>= pure . C.getTasksMatching (const True)

@@ -58,6 +58,7 @@ library
       Domain.TaskDetail
       Effect
       Effect.Error
+      Effect.Interactive
       Effect.Persistence
       External.Interval
       External.ISO8601
@@ -116,6 +117,8 @@ library
     , formatting
     , hashable
     , mtl
+    , nonempty-vector
+    , number-length
     , optparse-applicative
     , regex-tdfa
     , split
@@ -183,6 +186,8 @@ executable todo
     , formatting
     , hashable
     , mtl
+    , nonempty-vector
+    , number-length
     , optparse-applicative
     , regex-tdfa
     , split

@@ -1,6 +1,10 @@
+{-# LANGUAGE ImplicitParams #-}
+{-# LANGUAGE PatternSynonyms #-}
+
 module CliParser.Options
     ( Options (..)
     , Command (..)
+    , GlobalFlags (..)
     , AddCommand (..)
     , ListCommand (..)
     , EditCommand (..)
@@ -25,7 +29,13 @@ import External.Prelude
 
 data Options = Options
     { optCommand :: Command
-    , verbose :: Bool
+    , globalFlags :: GlobalFlags
+    }
+    deriving (Show)
+
+data GlobalFlags = GlobalFlags
+    { verbose :: Bool
+    , interactive :: Bool
     }
     deriving (Show)
 

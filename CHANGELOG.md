@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 - Improved the `list` subcommand by allowing users to customize displayed columns, either explicitly with `--columns` or via predefined presets.
+- Added a global `--interactive` flag that prompts for confirmation before destructive subcommands (edit/mark/delete) and asks the user to select a target when edit or mark matches multiple tasks.
 
 ## [3.0.1] - 2026-01-31
 

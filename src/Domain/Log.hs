@@ -1,8 +1,9 @@
-module Domain.Log (renderTaskDetail, renderTaskSummary) where
+module Domain.Log (renderTaskDetail, renderTaskSummary, renderTaskConcise) where
 
 import Data.HashSet (HashSet)
 import Data.Text (Text)
 import Data.Time.LocalTime (TimeZone, utcToLocalTime)
+import Formatting (sformat, stext, (%), (%+))
 
 import Data.HashSet qualified as HS
 import Data.List qualified as L
@@ -20,7 +21,7 @@ renderTaskDetail tz TaskDetail{name, status, deadline, tags, memo, importance} =
         , "  deadline:   " <> renderDeadline tz deadline
         , "  importance: " <> into (show importance)
         , "  tags:       " <> renderTags False tags
-        , "  memo:       " <> if T.null memo then "N/A" else memo
+        , "  memo:       " <> renderMemo memo
         ]
 
 renderTaskSummary :: TaskDetail -> Text
@@ -32,6 +33,15 @@ renderTaskSummary TaskDetail{name, status, tags} =
         , "' "
         , if HS.null tags then "" else renderTags True tags
         ]
+
+renderTaskConcise :: TimeZone -> TaskDetail -> Text
+renderTaskConcise tz TaskDetail{name, deadline, tags, memo} =
+    sformat
+        ("[" % stext % "][" % stext % "]" %+ stext %+ "(memo:" %+ stext % ")")
+        (renderDeadline tz deadline)
+        (renderTags False tags)
+        name
+        (renderMemo memo)
 
 renderDeadline :: TimeZone -> TaskDetailDeadline -> Text
 renderDeadline _ DBoundless = "N/A"
@@ -45,3 +55,6 @@ renderTags delimRequired tags
             & L.sort
             & T.intercalate " "
             & bool id (("(tags: " <>) . (<> ")")) delimRequired
+
+renderMemo :: Text -> Text
+renderMemo = liftA2 (bool "N/A") id (not . T.null)

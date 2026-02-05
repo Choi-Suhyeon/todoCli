@@ -58,14 +58,24 @@ longHelpOpt =
     longHelpRaw = $(embedFile "docs/long-help.txt")
 
 pOptions :: (HasConfig) => Parser Options
-pOptions = Options <$> pCommand <*> pVerbose
+pOptions = Options <$> pCommand <*> pGlobalFlags
+  where
+    pGlobalFlags :: Parser GlobalFlags
+    pGlobalFlags = GlobalFlags <$> pVerbose <*> pInteractive
 
-pVerbose :: Parser Bool
-pVerbose =
-    switch
-        $ short 'v'
-        <> long "verbose"
-        <> help "Show verbose logs during processing"
+    pVerbose :: Parser Bool
+    pVerbose =
+        switch
+            $ short 'v'
+            <> long "verbose"
+            <> help "Show verbose logs during processing"
+
+    pInteractive :: Parser Bool
+    pInteractive =
+        switch
+            $ short 'i'
+            <> long "interactive"
+            <> help "Confirm changes and target selection"
 
 pCommand :: (HasConfig) => Parser Command
 pCommand = hsubparser $ cAdd <> cList <> cEdit <> cMark <> cDelete

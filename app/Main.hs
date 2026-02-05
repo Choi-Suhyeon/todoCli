@@ -8,12 +8,15 @@ import Data.HashSet (HashSet)
 import Data.List.NonEmpty (nonEmpty)
 import Data.Text (Text)
 import Data.Time.Clock (getCurrentTime)
-import Data.Time.LocalTime (getCurrentTimeZone, localTimeToUTC)
+import Data.Time.LocalTime (TimeZone, getCurrentTimeZone, localTimeToUTC)
+import Data.Vector.NonEmpty (NonEmptyVector)
 import Formatting (int, sformat, stext, (%))
 import System.Exit (exitFailure, exitSuccess)
 import System.IO.Error (ioeGetErrorType, isDoesNotExistErrorType)
 
 import Data.HashSet qualified as HS
+import Data.Text qualified as T
+import Data.Vector.NonEmpty qualified as NEV
 
 import CliParser
 import Common
@@ -128,7 +131,7 @@ main = do
 
         UsingCereal reg1 & serialize & writeData
 
-    printLog' opts.verbose $ logs0 <> logs1
+    printLog' opts.globalFlags.verbose $ logs0 <> logs1
     bool exitFailure exitSuccess $ isRight res
   where
     printLog' :: Bool -> Log -> IO ()
@@ -217,10 +220,14 @@ main = do
         invariants :: [TodoRegistry -> Bool]
         invariants = [checkIdInvariant, checkTagIndexInvariant, checkStatusIndexInvariant]
 
-main' :: Options -> App ()
-main' Options{optCommand} = runCommand optCommand
+type UsingGlobalFlag = ?gFlags :: GlobalFlags
 
-runCommand :: Command -> App ()
+main' :: Options -> App ()
+main' Options{optCommand, globalFlags} = runCommand optCommand
+  where
+    ?gFlags = globalFlags
+
+runCommand :: (UsingGlobalFlag) => Command -> App ()
 runCommand (Add x) = runAddCommand x
 runCommand (List x) = runListCommand x
 runCommand (Edit x) = runEditCommand x
@@ -248,7 +255,6 @@ runListCommand ListCommand{tags, status, importance, columns, shouldReverse} = d
         [tasks1, tasks2, tasks3]
             & catMaybes
             & foldl' HS.intersection allTasks
-            & into
             & getTaskDetails
             & fmap (sortTaskDetails >>> bool id reverse shouldReverse)
 
@@ -274,23 +280,27 @@ runListCommand ListCommand{tags, status, importance, columns, shouldReverse} = d
 
     logOutput $ renderTable renderConfig snapshots
 
-runEditCommand :: EditCommand -> App ()
-runEditCommand EditCommand{tgtName, name, deadline, memo, tags, importance} = do
-    target <- getUniqueTarget tgtName
-    utcDeadline <- traverse optionDeadlineToEntryDeadline deadline
-
-    flip
-        editTask
-        target
-        EntryPatch
-            { name
-            , importance
-            , status = Nothing
-            , deadline = utcDeadline
-            , memo = processMemo memo
-            , tags = processTags tags
-            }
+runEditCommand :: (UsingGlobalFlag) => EditCommand -> App ()
+runEditCommand EditCommand{tgtName, name, deadline, memo, tags, importance} =
+    traverse optionDeadlineToEntryDeadline deadline >>= \utcDeadline ->
+        getTasksByNameRegex tgtName
+            <&> toList
+            >>= resolveTaskId
+            >>= editIfexists utcDeadline
   where
+    editIfexists :: Maybe EntryDeadline -> Maybe TaskId -> App ()
+    editIfexists utcDeadline =
+        traverse_
+            $ editTask
+                EntryPatch
+                    { name
+                    , importance
+                    , status = Nothing
+                    , deadline = utcDeadline
+                    , memo = processMemo memo
+                    , tags = processTags tags
+                    }
+
     processMemo :: Maybe EditMemo -> Maybe Text
     processMemo (Just Remove) = Just ""
     processMemo (Just (Memo m)) = Just m
@@ -301,42 +311,104 @@ runEditCommand EditCommand{tgtName, name, deadline, memo, tags, importance} = do
     processTags (Just (Substitute s)) = Just s
     processTags Nothing = Nothing
 
-runMarkCommand :: MarkCommand -> App ()
-runMarkCommand (MrkDone tgtName) = getUniqueTarget tgtName >>= markTask EDone
-runMarkCommand (MrkUndone tgtName) = getUniqueTarget tgtName >>= markTask EUndone
+runMarkCommand :: (UsingGlobalFlag) => MarkCommand -> App ()
+runMarkCommand mrk =
+    getTasksByNameRegex tgtName
+        <&> toList
+        >>= resolveTaskId
+        >>= traverse_ (markTask status)
+  where
+    status :: EntryStatus
+    tgtName :: Text
 
-runDeleteCommand :: DeleteCommand -> App ()
-runDeleteCommand DelAll = getAllTasks >>= deleteTasks
-runDeleteCommand DelBy{byName, byTags, byStatus, byImportance} = do
-    tasks1 <- traverse getTasksByNameRegex byName
-    tasks2 <- traverse getTasksWithAllTags byTags
-    tasks3 <- traverse getTasksWithinImportanceRange byImportance
-    tasks4 <- (`traverse` byStatus) \case
-        DelDone -> getDoneTasks
-        DelOverdue -> getOverdueTasks
+    (status, tgtName) = case mrk of
+        MrkDone t -> (EDone, t)
+        MrkUndone t -> (EUndone, t)
 
-    tasks <-
+runDeleteCommand :: (UsingGlobalFlag) => DeleteCommand -> App ()
+runDeleteCommand del = do
+    tz <- asks (.runtime.tz)
+    tgtIds <-
+        gatherTargets del >>= \case
+            Nothing -> throwError $ ParserE NoOptionsProvided
+            Just [] -> throwError $ ParserE DeletionTargetNotFound
+            Just xs -> pure xs
+
+    (`when` deleteTasks tgtIds)
+        =<< bool (pure True) (doInteraction tz tgtIds) ?gFlags.interactive
+  where
+    gatherTargets :: DeleteCommand -> App (Maybe (HashSet TaskId))
+    gatherTargets DelAll = pure <$> getAllTasks
+    gatherTargets DelBy{byName, byTags, byStatus, byImportance} = do
+        tasks1 <- traverse getTasksByNameRegex byName
+        tasks2 <- traverse getTasksWithAllTags byTags
+        tasks3 <- traverse getTasksWithinImportanceRange byImportance
+        tasks4 <- (`traverse` byStatus) \case
+            DelDone -> getDoneTasks
+            DelOverdue -> getOverdueTasks
+
         [tasks1, tasks2, tasks3, tasks4]
             & catMaybes
             & nonEmpty
             & fmap (foldr1 HS.intersection)
-            & handleResult
+            & pure
 
-    deleteTasks tasks
+    doInteraction :: (Foldable f) => TimeZone -> f TaskId -> App Bool
+    doInteraction tz =
+        chooseYesOrNoUntil
+            . decorateYesNoMsg
+            . renderTasks
+            <=< pure
+            . catMaybes
+            <=< traverse getOneTaskDetail
+            . toList
+      where
+        renderTasks :: (Foldable f) => f TaskDetail -> Text
+        renderTasks = foldr ((<>) . renderTask) T.empty
+
+        renderTask :: TaskDetail -> Text
+        renderTask = ("  " <>) . (<> "\n") . renderTaskConcise tz
+
+resolveTaskId
+    :: (Traversable t, UsingGlobalFlag) => t TaskId -> App (Maybe TaskId)
+resolveTaskId targetIds = do
+    tz <- asks (.runtime.tz)
+    targetDetails <- traverse getOneTaskDetail targetIds
+    targets <-
+        zip (toList targetIds) (toList targetDetails)
+            & mapMaybe (\(i, md) -> (i,) <$> md)
+            & toNonEmptyVector
+            & maybe (throwError $ ParserE TargetNotFoundError) pure
+    bool
+        (Just . fst <$> fromSingleton targets)
+        (doInteraction tz targets)
+        ?gFlags.interactive
   where
-    handleResult :: Maybe (HashSet TaskId) -> App (HashSet TaskId)
-    handleResult Nothing = throwError $ ParserE NoOptionsProvided
-    handleResult (Just []) = throwError $ ParserE DeletionTargetNotFound
-    handleResult (Just xs) = pure xs
+    toNonEmptyVector :: (Foldable f) => f a -> Maybe (NonEmptyVector a)
+    toNonEmptyVector = NEV.fromList . toList
 
-getUniqueTarget :: (MonadAppError m, MonadRegistry m) => Text -> m TaskId
-getUniqueTarget = getTasksByNameRegex >=> getFromSingleton
+    fromSingleton :: (Foldable f, MonadAppError m) => f a -> m a
+    fromSingleton = (. toList) \case
+        [x] -> pure x
+        [] -> throwError $ ParserE TargetNotFoundError
+        _ -> throwError $ ParserE MultipleTargetsError
 
-getFromSingleton :: (Foldable f, MonadAppError m) => f a -> m a
-getFromSingleton = (. toList) \case
-    [x] -> pure x
-    [] -> throwError $ ParserE TargetNotFoundError
-    _ -> throwError $ ParserE MultipleTargetsError
+    doInteraction
+        :: TimeZone -> NonEmptyVector (TaskId, TaskDetail) -> App (Maybe TaskId)
+    doInteraction tz =
+        liftA3 bool (confirmOne . NEV.head) selectOne ((> 1) . length)
+      where
+        selectOne :: NonEmptyVector (TaskId, TaskDetail) -> App (Maybe TaskId)
+        selectOne = fmap (Just . fst) . chooseAmongUntil (renderTaskConcise tz . snd)
+
+        confirmOne :: (TaskId, TaskDetail) -> App (Maybe TaskId)
+        confirmOne (tid, detail) = do
+            choice <-
+                renderTaskDetail tz detail
+                    & decorateYesNoMsg
+                    & chooseYesOrNoUntil
+
+            pure $ bool Nothing (Just tid) choice
 
 optionDeadlineToEntryDeadline
     :: (MonadEnv m) => OptionDeadline -> m EntryDeadline
@@ -350,3 +422,8 @@ toViewColName LstTags = CNTags
 toViewColName LstStatus = CNStatus
 toViewColName LstDeadline = CNDeadline
 toViewColName LstImportance = CNImportance
+
+decorateYesNoMsg :: Text -> Text
+decorateYesNoMsg =
+    ("Target:\n" <>)
+        . (<> "[?] This action is destructive.\n[?] Do you want to continue")

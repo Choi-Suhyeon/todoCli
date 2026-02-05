@@ -20,6 +20,7 @@ module External.Prelude
     , module Data.Traversable
     , module Witch
     , maybeToEither
+    , eitherToMaybe
     , liftSafeIO
     , tee
     , teeM
@@ -55,6 +56,10 @@ infixr 9 .:
 maybeToEither :: a -> Maybe b -> Either a b
 maybeToEither _ (Just b) = Right b
 maybeToEither a Nothing = Left a
+
+eitherToMaybe :: Either a b -> Maybe b
+eitherToMaybe (Right a) = Just a
+eitherToMaybe (Left _) = Nothing
 
 liftSafeIO :: (Exception e, MonadIO m) => IO a -> m (Either e a)
 liftSafeIO = liftIO . try

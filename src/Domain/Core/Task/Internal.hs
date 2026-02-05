@@ -169,11 +169,11 @@ modifyTask tz now entry task = do
         Just (EBound d) -> validateDeadline tz now d
         _ -> pure ()
 
-    whenJust validateImportance entry.importance
-    whenJust validateName entry.name
-    whenJust validateMemo entry.memo
-    whenJust validateTagCount entry.tags
-    whenJust validateAllTagLength entry.tags
+    traverse_ validateImportance entry.importance
+    traverse_ validateName entry.name
+    traverse_ validateMemo entry.memo
+    traverse_ validateTagCount entry.tags
+    traverse_ validateAllTagLength entry.tags
 
     pure
         Task
@@ -237,9 +237,6 @@ validateAllTagLength = (`HS.foldl'` Right ()) \acc tag ->
             (InvalidTagLength tagLenBound)
             tagLenBound
             (safeWctwidth tag)
-
-whenJust :: (Applicative f) => (a -> f ()) -> Maybe a -> f ()
-whenJust = maybe (pure ())
 
 ensureInBound
     :: (Ord a) => DomainError -> Interval a -> a -> Either DomainError ()

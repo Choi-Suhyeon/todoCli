@@ -51,6 +51,8 @@ let dependencies : List Text =
     , "formatting"
     , "hashable"
     , "mtl"
+    , "nonempty-vector"
+    , "number-length"
     , "optparse-applicative"
     , "regex-tdfa"
     , "split"
